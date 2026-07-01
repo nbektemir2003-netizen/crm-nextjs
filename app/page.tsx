@@ -420,8 +420,18 @@ export default function DashboardPage() {
     mainPaid: taxAct.filter(c => taxDone[`${c.n}|main|${taxMonth}`]).length,
   }
   const reps = buildReports(companies)
-  const taxReps = repQ ? reps.tax.filter(r => r.q === repQ) : reps.tax
-  const statReps = repQ ? reps.stat.filter(r => r.q === repQ) : reps.stat
+  function applyRepFilters(list: RepEntry[]) {
+    return list.filter(r => {
+      if (repQ && r.q !== repQ) return false
+      if (repReg && r.reg !== repReg) return false
+      const key = `${r.co}|${r.type}|${r.q}`
+      if (repStatus === 'done' && !repDone[key]) return false
+      if (repStatus === 'pending' && repDone[key]) return false
+      return true
+    })
+  }
+  const taxReps = applyRepFilters(reps.tax)
+  const statReps = applyRepFilters(reps.stat)
   const stRep = {
     taxTotal: taxReps.length,
     taxDone: taxReps.filter(r => repDone[`${r.co}|${r.type}|${r.q}`]).length,
