@@ -53,7 +53,6 @@ export default function LoginPage() {
               onChange={e => setPassword(e.target.value)}
               className="w-full border border-[#d3d1c7] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-[#185fa5]"
               placeholder="••••••••"
-              required
             />
           </div>
           {error && <p className="text-[12px] text-red-500">{error}</p>}
