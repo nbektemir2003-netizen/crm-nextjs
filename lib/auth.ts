@@ -1,9 +1,10 @@
 import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
-import { prisma } from './prisma'
+import { createClient } from '@supabase/supabase-js'
 import bcrypt from 'bcryptjs'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || 'crm-outsource-2026-kz-secret-key-xbx',
   session: { strategy: 'jwt' },
   pages: { signIn: '/login' },
   providers: [
@@ -14,13 +15,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
-        })
-        if (!user) return null
-        const ok = await bcrypt.compare(credentials.password as string, user.passwordHash)
+        const sb = createClient('https://rqrbjiyqazarlomycdzc.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxcmJqaXlxYXphcmxvbXljZHpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3ODIzMDAsImV4cCI6MjA5ODM1ODMwMH0.dne7GGb29XICld8a5A9T0OyWsns-ChdII8GFJ2q4k08')
+        const { data } = await sb.from('User').select('*').eq('email', credentials.email as string).single()
+        if (!data) return null
+        const ok = await bcrypt.compare(credentials.password as string, data.passwordHash)
         if (!ok) return null
-        return { id: user.id, name: user.name, email: user.email, role: user.role }
+        return { id: data.id, name: data.name, email: data.email, role: data.role }
       },
     }),
   ],
