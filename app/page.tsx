@@ -284,7 +284,7 @@ export default function DashboardPage() {
 
   async function lookupBin() {
     const bin = newCoBin.trim()
-    if (!bin || bin.length < 12) { alert('Введите 12-значный БИН/ИИН'); return }
+    if (!bin || bin.length < 12) { showToast('Введите 12-значный БИН/ИИН'); return }
     setNewCoBinLoading(true)
     try {
       const res = await fetch(`/api/bin-lookup?bin=${bin}`)
@@ -293,10 +293,10 @@ export default function DashboardPage() {
         setNewCoName(data.name)
         showToast(`Найдено: ${data.name}`)
       } else {
-        showToast(data.error || 'Данные не найдены')
+        showToast('Не найдено — введите название вручную')
       }
     } catch {
-      showToast('Ошибка поиска по БИН')
+      showToast('Ошибка поиска — введите название вручную')
     } finally {
       setNewCoBinLoading(false)
     }
@@ -475,12 +475,12 @@ export default function DashboardPage() {
       {/* ═══════════════ КОМПАНИИ ═══════════════ */}
       <div className={`crm-sec${tab === 'co' ? ' active' : ''}`}>
         <div className="srow">
-          <div className="stat"><div className="sl">Всего</div><div className="sv">{stCo.total}</div></div>
-          <div className="stat"><div className="sl">Ежедневные</div><div className="sv">{stCo.daily}</div></div>
-          <div className="stat"><div className="sl">Раз в месяц</div><div className="sv">{stCo.monthly}</div></div>
-          <div className="stat"><div className="sl">Квартальные</div><div className="sv">{stCo.quarterly}</div></div>
-          <div className="stat"><div className="sl">Разовые</div><div className="sv">{stCo.once}</div></div>
-          <div className="stat"><div className="sl">На закрытие</div><div className="sv red">{stCo.closing}</div></div>
+          <div className="stat s-indigo"><div className="sl">Всего</div><div className="sv">{stCo.total}</div></div>
+          <div className="stat s-sky"><div className="sl">Ежедневные</div><div className="sv">{stCo.daily}</div></div>
+          <div className="stat s-sky"><div className="sl">Раз в месяц</div><div className="sv">{stCo.monthly}</div></div>
+          <div className="stat s-purple"><div className="sl">Квартальные</div><div className="sv">{stCo.quarterly}</div></div>
+          <div className="stat s-amber"><div className="sl">Разовые</div><div className="sv">{stCo.once}</div></div>
+          <div className="stat s-red"><div className="sl">На закрытие</div><div className="sv red">{stCo.closing}</div></div>
         </div>
         <div className="ff">
           <input type="text" placeholder="Поиск компании..." value={coQ} onChange={e => setCoQ(e.target.value)} />
@@ -522,12 +522,12 @@ export default function DashboardPage() {
       {/* ═══════════════ ЗАДАЧИ ═══════════════ */}
       <div className={`crm-sec${tab === 'tasks' ? ' active' : ''}`}>
         <div className="srow">
-          <div className="stat"><div className="sl">Всего</div><div className="sv">{stTasks.total}</div></div>
-          <div className="stat"><div className="sl">В работе</div><div className="sv amber">{stTasks.active}</div></div>
-          <div className="stat"><div className="sl">Выполнено</div><div className="sv green">{stTasks.done}</div></div>
-          <div className="stat"><div className="sl">Критично</div><div className="sv red">{stTasks.critical}</div></div>
-          <div className="stat"><div className="sl">Срочно</div><div className="sv amber">{stTasks.urgent}</div></div>
-          <div className="stat"><div className="sl">Просрочено</div><div className="sv red">{stTasks.overdue}</div></div>
+          <div className="stat s-indigo"><div className="sl">Всего</div><div className="sv">{stTasks.total}</div></div>
+          <div className="stat s-sky"><div className="sl">В работе</div><div className="sv amber">{stTasks.active}</div></div>
+          <div className="stat s-green"><div className="sl">Выполнено</div><div className="sv green">{stTasks.done}</div></div>
+          <div className="stat s-red"><div className="sl">Критично</div><div className="sv red">{stTasks.critical}</div></div>
+          <div className="stat s-amber"><div className="sl">Срочно</div><div className="sv amber">{stTasks.urgent}</div></div>
+          <div className="stat s-red"><div className="sl">Просрочено</div><div className="sv red">{stTasks.overdue}</div></div>
         </div>
         <div className="ff">
           <input type="text" placeholder="Поиск..." value={taskQ} onChange={e => setTaskQ(e.target.value)} />
@@ -602,9 +602,9 @@ export default function DashboardPage() {
       {/* ═══════════════ НАЛОГИ ═══════════════ */}
       <div className={`crm-sec${tab === 'tax' ? ' active' : ''}`}>
         <div className="srow">
-          <div className="stat"><div className="sl">Компаний</div><div className="sv">{stTax.count}</div></div>
-          <div className="stat"><div className="sl">Нал. уплачено</div><div className="sv green">{stTax.mainPaid}</div></div>
-          <div className="stat"><div className="sl">Нал. не уплачено</div><div className="sv red">{stTax.count - stTax.mainPaid}</div></div>
+          <div className="stat s-indigo"><div className="sl">Компаний</div><div className="sv">{stTax.count}</div></div>
+          <div className="stat s-green"><div className="sl">Нал. уплачено</div><div className="sv green">{stTax.mainPaid}</div></div>
+          <div className="stat s-red"><div className="sl">Нал. не уплачено</div><div className="sv red">{stTax.count - stTax.mainPaid}</div></div>
         </div>
         <div className="stabs">
           <button className={`stab${taxSubTab === 'main' ? ' active' : ''}`} onClick={() => setTaxSubTab('main')}>Налоговые платежи</button>
@@ -624,12 +624,12 @@ export default function DashboardPage() {
       {/* ═══════════════ ОТЧЁТНОСТЬ ═══════════════ */}
       <div className={`crm-sec${tab === 'rep' ? ' active' : ''}`}>
         <div className="srow">
-          <div className="stat"><div className="sl">Нал. всего</div><div className="sv">{stRep.taxTotal}</div></div>
-          <div className="stat"><div className="sl">Нал. сдано</div><div className="sv green">{stRep.taxDone}</div></div>
-          <div className="stat"><div className="sl">Нал. не сдано</div><div className="sv red">{stRep.taxTotal - stRep.taxDone}</div></div>
-          <div className="stat"><div className="sl">Стат. всего</div><div className="sv">{stRep.statTotal}</div></div>
-          <div className="stat"><div className="sl">Стат. сдано</div><div className="sv green">{stRep.statDone}</div></div>
-          <div className="stat"><div className="sl">Просрочено</div><div className="sv red">{stRep.overdue}</div></div>
+          <div className="stat s-indigo"><div className="sl">Нал. всего</div><div className="sv">{stRep.taxTotal}</div></div>
+          <div className="stat s-green"><div className="sl">Нал. сдано</div><div className="sv green">{stRep.taxDone}</div></div>
+          <div className="stat s-red"><div className="sl">Нал. не сдано</div><div className="sv red">{stRep.taxTotal - stRep.taxDone}</div></div>
+          <div className="stat s-purple"><div className="sl">Стат. всего</div><div className="sv">{stRep.statTotal}</div></div>
+          <div className="stat s-green"><div className="sl">Стат. сдано</div><div className="sv green">{stRep.statDone}</div></div>
+          <div className="stat s-red"><div className="sl">Просрочено</div><div className="sv red">{stRep.overdue}</div></div>
         </div>
         <div className="stabs">
           <button className={`stab${repSubTab === 'tax' ? ' active' : ''}`} onClick={() => setRepSubTab('tax')}>Налоговые отчёты</button>
