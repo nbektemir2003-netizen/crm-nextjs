@@ -451,11 +451,11 @@ export default function DashboardPage() {
     <div className="crm-app">
       {/* ШАПКА */}
       <div className="crm-header">
-        <i className="ti ti-building" style={{ fontSize: 18, color: '#185fa5' }}></i>
-        <h1>CRM Аутсорс 2026</h1>
+        <div style={{ width: 28, height: 28, background: '#6366f1', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, fontWeight: 700, flexShrink: 0 }}>B</div>
+        <h1>BuhDesk</h1>
         <span className={`sync-status ${syncCls}`} style={{ marginLeft: 'auto' }}>● {syncText}</span>
-        <span style={{ fontSize: 11, color: '#185fa5', fontWeight: 500 }}>👤 {userName}</span>
-        <button onClick={() => signOut({ callbackUrl: '/login' })} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, border: '1px solid #d3d1c7', background: '#fff', color: '#888780', cursor: 'pointer' }}>Выйти</button>
+        <span style={{ fontSize: 11, color: '#6366f1', fontWeight: 500 }}>👤 {userName}</span>
+        <button onClick={() => signOut({ callbackUrl: '/login' })} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer' }}>Выйти</button>
         <button onClick={() => { setDark(!dark); localStorage.setItem('crm_theme', !dark ? 'dark' : 'light') }} className="theme-toggle" title="Сменить тему">{dark ? '☀️' : '🌙'}</button>
         <button onClick={() => setShowNotif(true)} style={{ fontSize: 16, background: 'none', border: '1px solid #d3d1c7', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', position: 'relative' }} title="Уведомления">
           🔔{myTasks.length > 0 && <span style={{ position: 'absolute', top: -4, right: -4, background: '#a32d2d', color: '#fff', borderRadius: 99, fontSize: 9, padding: '1px 4px', fontWeight: 600 }}>{myTasks.length}</span>}

@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* CRM Аутсорс 2026 — Серый современный (Notion/Linear style) */
+/* BuhDesk — Серый современный (Notion/Linear style) */
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;color:#0f172a;min-height:100vh}
 .crm-app{max-width:1200px;margin:0 auto;padding:16px}

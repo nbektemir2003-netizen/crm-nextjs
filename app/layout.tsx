@@ -3,8 +3,8 @@ import './globals.css'
 import { SessionProvider } from 'next-auth/react'
 
 export const metadata: Metadata = {
-  title: 'CRM Аутсорс 2026',
-  description: 'CRM для бухгалтерской компании',
+  title: 'BuhDesk',
+  description: 'Бухгалтерский аутсорсинг — управление компаниями, налогами и отчётами',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
