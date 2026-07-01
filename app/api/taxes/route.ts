@@ -1,23 +1,24 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 
 export async function GET() {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const taxes = await prisma.taxPayment.findMany({
-    include: { company: true },
-    orderBy: { dueDate: 'asc' },
-  })
-  return NextResponse.json(taxes)
+  const { data, error } = await supabase.from('TaxPayment').select('*, company:Company(name)').order('dueDate', { ascending: true })
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data)
 }
 
 export async function POST(req: Request) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await req.json()
-  const tax = await prisma.taxPayment.create({ data: body })
-  return NextResponse.json(tax)
+  const { data, error } = await supabase.from('TaxPayment').insert([{
+    id: crypto.randomUUID(), ...body
+  }]).select().single()
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data)
 }
 
 export async function PATCH(req: Request) {
@@ -25,6 +26,7 @@ export async function PATCH(req: Request) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await req.json()
   const { id, ...data } = body
-  const tax = await prisma.taxPayment.update({ where: { id }, data })
-  return NextResponse.json(tax)
+  const { data: updated, error } = await supabase.from('TaxPayment').update(data).eq('id', id).select().single()
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(updated)
 }
