@@ -134,7 +134,6 @@ export default function DashboardPage() {
   const [repDone, setRepDone] = useState<Record<string, boolean>>({})
   const [syncText, setSyncText] = useState('Загрузка...')
   const [syncCls, setSyncCls] = useState<SyncCls>('syncing')
-  const [dark, setDark] = useState(false)
   const [toast, setToast] = useState('')
   const [toastVisible, setToastVisible] = useState(false)
   const [users, setUsers] = useState<string[]>(DEFAULT_USERS)
@@ -200,13 +199,7 @@ export default function DashboardPage() {
   }, [status])
 
   useEffect(() => {
-    if (dark) document.body.classList.add('dark')
-    else document.body.classList.remove('dark')
-  }, [dark])
-
-  useEffect(() => {
-    const saved = localStorage.getItem('crm_theme')
-    if (saved === 'dark') setDark(true)
+    document.body.classList.remove('dark')
     const savedUsers = localStorage.getItem('crm_users')
     if (savedUsers) try { setUsers(JSON.parse(savedUsers)) } catch {}
     const td = localStorage.getItem('crm_taxDone')
@@ -488,9 +481,6 @@ export default function DashboardPage() {
             <button className="crm-icon-btn" onClick={() => setShowNotif(true)} title="Уведомления">
               <i className="ti ti-bell"></i>
               {myTasks.length > 0 && <span style={{ position: 'absolute', top: -4, right: -4, background: '#ef4444', color: '#fff', borderRadius: 99, fontSize: 9, padding: '1px 4px', fontWeight: 600, lineHeight: 1 }}>{myTasks.length}</span>}
-            </button>
-            <button className="crm-icon-btn" onClick={() => { setDark(!dark); localStorage.setItem('crm_theme', !dark ? 'dark' : 'light') }} title="Сменить тему">
-              <i className={`ti ${dark ? 'ti-sun' : 'ti-moon'}`}></i>
             </button>
           </div>
         </div>
