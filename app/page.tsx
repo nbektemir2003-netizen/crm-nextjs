@@ -466,15 +466,11 @@ export default function DashboardPage() {
 
         <div className="crm-sidebar-bottom">
           <div className="crm-sidebar-user">
-            <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
-              {userName.charAt(0)}
-            </div>
-            <span style={{ fontSize: 12, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userName}</span>
+            <div className="user-avatar">{userName.charAt(0) || 'A'}</div>
+            <span className="user-name">{userName || 'Администратор'}</span>
           </div>
-          <button onClick={() => signOut({ callbackUrl: '/login' })} style={{ display: 'flex', alignItems: 'center', gap: 7, width: '100%', padding: '7px 10px', border: 'none', background: 'transparent', color: '#64748b', fontSize: 12, cursor: 'pointer', borderRadius: 6 }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#334155')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-            <i className="ti ti-logout" style={{ fontSize: 15 }}></i>Выйти
+          <button className="crm-logout" onClick={() => signOut({ callbackUrl: '/login' })}>
+            <i className="ti ti-logout"></i>Выйти
           </button>
         </div>
       </aside>
@@ -483,15 +479,20 @@ export default function DashboardPage() {
       <div className="crm-main">
         {/* Топбар */}
         <div className="crm-topbar">
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
+          <span className="crm-topbar-title">
             {tab === 'co' ? 'Компании' : tab === 'tasks' ? 'Задачи' : tab === 'tax' ? 'Налоги до 25-го' : tab === 'rep' ? 'Отчётность' : 'Добавить компанию'}
           </span>
-          <span className={`sync-status ${syncCls}`} style={{ marginLeft: 'auto' }}>● {syncText}</span>
-          <button onClick={() => setShowNotif(true)} style={{ fontSize: 15, background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 9px', cursor: 'pointer', position: 'relative', color: '#64748b' }} title="Уведомления">
-            🔔{myTasks.length > 0 && <span style={{ position: 'absolute', top: -4, right: -4, background: '#ef4444', color: '#fff', borderRadius: 99, fontSize: 9, padding: '1px 4px', fontWeight: 600 }}>{myTasks.length}</span>}
-          </button>
-          <button onClick={() => { setDark(!dark); localStorage.setItem('crm_theme', !dark ? 'dark' : 'light') }} className="theme-toggle" title="Сменить тему">{dark ? '☀️' : '🌙'}</button>
-          <span style={{ fontSize: 11, color: '#94a3b8' }}>{dateStr}</span>
+          <div className="crm-topbar-actions">
+            <span className={`sync-status ${syncCls}`}>{syncText}</span>
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>{dateStr}</span>
+            <button className="crm-icon-btn" onClick={() => setShowNotif(true)} title="Уведомления">
+              <i className="ti ti-bell"></i>
+              {myTasks.length > 0 && <span style={{ position: 'absolute', top: -4, right: -4, background: '#ef4444', color: '#fff', borderRadius: 99, fontSize: 9, padding: '1px 4px', fontWeight: 600, lineHeight: 1 }}>{myTasks.length}</span>}
+            </button>
+            <button className="crm-icon-btn" onClick={() => { setDark(!dark); localStorage.setItem('crm_theme', !dark ? 'dark' : 'light') }} title="Сменить тему">
+              <i className={`ti ${dark ? 'ti-sun' : 'ti-moon'}`}></i>
+            </button>
+          </div>
         </div>
 
         {/* Контент */}
