@@ -902,7 +902,7 @@ export default function DashboardPage() {
       <div className={`toast${toastVisible ? ' show' : ''}`}>{toast}</div>
         </div>{/* /crm-content */}
       </div>{/* /crm-main */}
-    </div>{/* /crm-layout */}
+    </div>
   )
 }
 
