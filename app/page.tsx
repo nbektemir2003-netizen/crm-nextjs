@@ -14,20 +14,24 @@ const FC: Record<string, string> = { 'Ежедневная': 'bb', 'Раз в м
 const MN = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
 const MN_S = ['', 'Янв', 'Фев', 'Март', 'Апр', 'Май', 'Июнь', 'Июль', 'Авг', 'Сент', 'Окт', 'Ноя', 'Дек']
 const QM: Record<string, number[]> = { '1 квартал': [1, 2, 3], '2 квартал': [4, 5, 6], '3 квартал': [7, 8, 9], '4 квартал': [10, 11, 12] }
-const QTRS = [
-  { q: '1 квартал', due300: '2026-05-15', due200: '2026-05-15', due910: '', has910: false },
-  { q: '2 квартал', due300: '2026-08-15', due200: '2026-08-15', due910: '2026-08-15', has910: true },
-  { q: '3 квартал', due300: '2026-11-15', due200: '2026-11-15', due910: '', has910: false },
-  { q: '4 квартал', due300: '2027-02-15', due200: '2027-02-15', due910: '2027-02-15', has910: true },
-]
-const QORDER = ['1 квартал', '2 квартал', '3 квартал', '4 квартал', 'Годовой']
-const QLABELS: Record<string, string> = {
-  '1 квартал': '1 квартал (янв–март 2026) · до 15 мая 2026',
-  '2 квартал': '2 квартал (апр–июнь 2026) · до 15 авг 2026',
-  '3 квартал': '3 квартал (июль–сент 2026) · до 15 ноя 2026',
-  '4 квартал': '4 квартал (окт–дек 2026) · до 15 фев 2027',
-  'Годовой': 'Годовой (100/920) · до 31 марта 2027',
+function getQTRS(y: number) {
+  return [
+    { q: '1 квартал', due300: `${y}-05-15`, due200: `${y}-05-15`, due910: '', has910: false },
+    { q: '2 квартал', due300: `${y}-08-15`, due200: `${y}-08-15`, due910: `${y}-08-15`, has910: true },
+    { q: '3 квартал', due300: `${y}-11-15`, due200: `${y}-11-15`, due910: '', has910: false },
+    { q: '4 квартал', due300: `${y+1}-02-15`, due200: `${y+1}-02-15`, due910: `${y+1}-02-15`, has910: true },
+  ]
 }
+function getQLABELS(y: number): Record<string, string> {
+  return {
+    '1 квартал': `1 квартал (янв–март ${y}) · до 15 мая ${y}`,
+    '2 квартал': `2 квартал (апр–июнь ${y}) · до 15 авг ${y}`,
+    '3 квартал': `3 квартал (июль–сент ${y}) · до 15 ноя ${y}`,
+    '4 квартал': `4 квартал (окт–дек ${y}) · до 15 фев ${y+1}`,
+    'Годовой': `Годовой (100/920) · до 31 марта ${y+1}`,
+  }
+}
+const QORDER = ['1 квартал', '2 квартал', '3 квартал', '4 квартал', 'Годовой']
 const DEFAULT_USERS = ['Нурдаулет', 'Акмарал', 'Динара', 'Жания', 'Ұлбосын', 'Айзат']
 
 // ─── УТИЛИТЫ ────────────────────────────
@@ -67,7 +71,9 @@ function getStatTypes(reg: string): string[] {
 
 type RepEntry = { co: string; reg: string; type: string; q: string; due: string; months: number[] | null }
 
-function buildReports(companies: Company[]): { tax: RepEntry[]; stat: RepEntry[] } {
+function buildReports(companies: Company[], year: number): { tax: RepEntry[]; stat: RepEntry[] } {
+  const QTRS = getQTRS(year)
+  const ny = year + 1
   const tax: RepEntry[] = [], stat: RepEntry[] = []
   for (const c of companies) {
     if (c.status !== 'Активная') continue
@@ -93,11 +99,11 @@ function buildReports(companies: Company[]): { tax: RepEntry[]; stat: RepEntry[]
       }
     }
     if ((r === 'ОУР (НДС)' || r === 'ОУР') && !skip.includes('100.00 (КПН годовой)'))
-      tax.push({ co: c.n, reg: r, type: '100.00 (год. КПН)', q: 'Годовой', due: '2027-03-31', months: null })
+      tax.push({ co: c.n, reg: r, type: '100.00 (год. КПН)', q: 'Годовой', due: `${ny}-03-31`, months: null })
     if (r === 'КХ' && !skip.includes('920.00 (декл. КХ)'))
-      tax.push({ co: c.n, reg: r, type: '920.00 (декл. КХ)', q: 'Годовой', due: '2027-03-31', months: null })
+      tax.push({ co: c.n, reg: r, type: '920.00 (декл. КХ)', q: 'Годовой', due: `${ny}-03-31`, months: null })
     if (r !== 'КХ' && !skip.includes('11-МП (год. стат.)'))
-      stat.push({ co: c.n, reg: r, type: '11-МП (год. стат.)', q: 'Годовой', due: '2027-02-15', months: null })
+      stat.push({ co: c.n, reg: r, type: '11-МП (год. стат.)', q: 'Годовой', due: `${ny}-02-15`, months: null })
     extra.forEach(e => {
       if (skip.includes(e)) return
       const parts = e.split('|')
@@ -114,8 +120,8 @@ function buildReports(companies: Company[]): { tax: RepEntry[]; stat: RepEntry[]
           else tax.push({ co: c.n, reg: r, type: name + ' (ежемес.)', q: qt.q, due: qt.due200, months: QM[qt.q] })
         }
       } else {
-        if (isStat) stat.push({ co: c.n, reg: r, type: name, q: 'Годовой', due: '2027-03-31', months: null })
-        else tax.push({ co: c.n, reg: r, type: name, q: 'Годовой', due: '2027-03-31', months: null })
+        if (isStat) stat.push({ co: c.n, reg: r, type: name, q: 'Годовой', due: `${ny}-03-31`, months: null })
+        else tax.push({ co: c.n, reg: r, type: name, q: 'Годовой', due: `${ny}-03-31`, months: null })
       }
     })
   }
@@ -151,6 +157,7 @@ export default function DashboardPage() {
   const [taskStat, setTaskStat] = useState('')
 
   // Фильтры налогов
+  const [taxYear, setTaxYear] = useState(2026)
   const [taxMonth, setTaxMonth] = useState(7)
   const [taxFreq, setTaxFreq] = useState('')
   const [taxSearch, setTaxSearch] = useState('')
@@ -159,6 +166,7 @@ export default function DashboardPage() {
   const [taxSubTab, setTaxSubTab] = useState<'main' | 'stat'>('main')
 
   // Фильтры отчётов
+  const [repYear, setRepYear] = useState(2026)
   const [repQ, setRepQ] = useState('')
   const [repReg, setRepReg] = useState('')
   const [repStatus, setRepStatus] = useState('')
@@ -402,32 +410,32 @@ export default function DashboardPage() {
   }
   function markAllTaxPaid() {
     const nd = { ...taxDone }
-    taxAct.forEach(c => { nd[`${c.n}|main|${taxMonth - 1}`] = true })
+    taxAct.forEach(c => { nd[taxKey(c.n, taxMonth - 1)] = true })
     saveTaxDone(nd)
     showToast(`Отмечено ${taxAct.length} компаний ✓`)
   }
   function exportTaxCSV() {
     const monthName = MN[taxMonth - 1]
-    const rows = ['﻿Компания,Режим,Группа,Статус']
+    const rows = ['﻿Компания\tРежим\tГруппа\tСтатус\tКатегория']
     taxAct.forEach(c => {
-      const paid = taxDone[`${c.n}|main|${taxMonth - 1}`] ? 'Уплачен' : 'Не уплачен'
-      rows.push(`"${c.n}","${c.reg}","${c.freq}","${paid}"`)
+      const paid = taxDone[taxKey(c.n, taxMonth - 1)] ? 'Уплачен' : 'Не уплачен'
+      rows.push(`${c.n}\t${c.reg}\t${c.freq}\t${paid}\t${c.cat}`)
     })
-    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8' })
+    const blob = new Blob([rows.join('\n')], { type: 'text/tab-separated-values;charset=utf-8' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = `налоги_${monthName}_2026.csv`; a.click()
+    const a = document.createElement('a'); a.href = url; a.download = `налоги_${monthName}_${taxYear}.tsv`; a.click()
     URL.revokeObjectURL(url)
   }
   function exportRepCSV() {
     const list = repSubTab === 'tax' ? taxReps : statReps
-    const rows = ['﻿Компания,Режим,Отчёт,Квартал,Срок,Статус']
+    const rows = ['﻿Компания\tРежим\tОтчёт\tКвартал\tСрок\tСтатус']
     list.forEach(r => {
-      const st = repDone[`${r.co}|${r.type}|${r.q}`] ? 'Сдан' : 'Не сдан'
-      rows.push(`"${r.co}","${r.reg}","${r.type}","${r.q}","${r.due}","${st}"`)
+      const st = repDone[`${r.co}|${r.type}|${r.q}|${repYear}`] ? 'Сдан' : 'Не сдан'
+      rows.push(`${r.co}\t${r.reg}\t${r.type}\t${r.q}\t${r.due}\t${st}`)
     })
-    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8' })
+    const blob = new Blob([rows.join('\n')], { type: 'text/tab-separated-values;charset=utf-8' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = `отчётность_2026.csv`; a.click()
+    const a = document.createElement('a'); a.href = url; a.download = `отчётность_${repYear}.tsv`; a.click()
     URL.revokeObjectURL(url)
   }
 
@@ -468,25 +476,26 @@ export default function DashboardPage() {
     overdue: active.filter(t => dl(t.date) < 0).length,
   }
   const actCos = companies.filter(c => {
-    if (c.status !== 'Активная') return false
     if (taxSearch && !c.n.toLowerCase().includes(taxSearch.toLowerCase())) return false
     if (taxCat && c.cat !== taxCat) return false
     if (taxReg && !c.reg.includes(taxReg)) return false
     return true
   })
   const taxAct = taxFreq ? actCos.filter(c => c.freq === taxFreq) : actCos
+  const taxKey = (co: string, m: number) => `${co}|main|${taxYear}-${m}`
   const stTax = {
     count: taxAct.length,
-    mainPaid: taxAct.filter(c => taxDone[`${c.n}|main|${taxMonth - 1}`]).length,
+    mainPaid: taxAct.filter(c => taxDone[taxKey(c.n, taxMonth - 1)]).length,
   }
-  const reps = buildReports(companies)
+  const reps = buildReports(companies, repYear)
+  const QLABELS = getQLABELS(repYear)
+  const repKey = (r: RepEntry) => `${r.co}|${r.type}|${r.q}|${repYear}`
   function applyRepFilters(list: RepEntry[]) {
     return list.filter(r => {
       if (repQ && r.q !== repQ) return false
       if (repReg && r.reg !== repReg) return false
-      const key = `${r.co}|${r.type}|${r.q}`
-      if (repStatus === 'done' && !repDone[key]) return false
-      if (repStatus === 'pending' && repDone[key]) return false
+      if (repStatus === 'done' && !repDone[repKey(r)]) return false
+      if (repStatus === 'pending' && repDone[repKey(r)]) return false
       return true
     })
   }
@@ -494,10 +503,10 @@ export default function DashboardPage() {
   const statReps = applyRepFilters(reps.stat)
   const stRep = {
     taxTotal: taxReps.length,
-    taxDone: taxReps.filter(r => repDone[`${r.co}|${r.type}|${r.q}`]).length,
+    taxDone: taxReps.filter(r => repDone[repKey(r)]).length,
     statTotal: statReps.length,
-    statDone: statReps.filter(r => repDone[`${r.co}|${r.type}|${r.q}`]).length,
-    overdue: taxReps.filter(r => !repDone[`${r.co}|${r.type}|${r.q}`] && dl(r.due) < 0).length,
+    statDone: statReps.filter(r => repDone[repKey(r)]).length,
+    overdue: taxReps.filter(r => !repDone[repKey(r)] && dl(r.due) < 0).length,
   }
 
   if (status === 'loading') return <div className="loading">Загрузка...</div>
@@ -750,7 +759,7 @@ export default function DashboardPage() {
 
         {/* Мини-анализ рисков */}
         {stTax.count - stTax.mainPaid > 0 && (() => {
-          const unpaid = taxAct.filter(c => !taxDone[`${c.n}|main|${taxMonth - 1}`])
+          const unpaid = taxAct.filter(c => !taxDone[taxKey(c.n, taxMonth - 1)])
           const high = unpaid.filter(c => c.risk === 'высокая')
           const mid = unpaid.filter(c => c.risk === 'средняя')
           const low = unpaid.filter(c => c.risk === 'низкая')
@@ -777,9 +786,14 @@ export default function DashboardPage() {
 
         <div className="ff" style={{ marginBottom: 6 }}>
           <input type="text" placeholder="Поиск компании..." value={taxSearch} onChange={e => setTaxSearch(e.target.value)} />
+          <select value={taxYear} onChange={e => setTaxYear(+e.target.value)}>
+            <option value={2025}>2025 год</option>
+            <option value={2026}>2026 год</option>
+            <option value={2027}>2027 год</option>
+          </select>
           <select value={taxMonth} onChange={e => setTaxMonth(+e.target.value)}>
-            {[6, 7, 8, 9, 10, 11, 12].map(m => (
-              <option key={m} value={m}>За {MN[m - 1]} → до 25 {MN[m]} 2026</option>
+            {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => (
+              <option key={m} value={m}>За {MN[m === 1 ? 12 : m - 1]} {m === 1 ? taxYear - 1 : taxYear} → до 25 {MN[m]}</option>
             ))}
           </select>
           <select value={taxFreq} onChange={e => setTaxFreq(e.target.value)}>
@@ -804,7 +818,7 @@ export default function DashboardPage() {
           <button className="btn-sm" onClick={markAllTaxPaid} style={{ marginLeft: 'auto' }}>✓ Отметить всех уплачено</button>
           <button className="btn-sm" onClick={exportTaxCSV} style={{ background: '#fff', color: '#6366f1', border: '1px solid #c7d2fe' }}>⬇ Скачать отчёт</button>
         </div>
-        <TaxSection companies={taxAct} taxDone={taxDone} taxMonth={taxMonth} taxFreq={taxFreq} onToggle={toggleTax} taxComments={taxComments} onComment={saveTaxComment} />
+        <TaxSection companies={taxAct} taxDone={taxDone} taxMonth={taxMonth} taxYear={taxYear} taxFreq={taxFreq} onToggle={toggleTax} taxComments={taxComments} onComment={saveTaxComment} />
       </div>
 
       {/* ═══════════════ ОТЧЁТНОСТЬ ═══════════════ */}
@@ -822,6 +836,11 @@ export default function DashboardPage() {
             <button className={`stab${repSubTab === 'tax' ? ' active' : ''}`} onClick={() => setRepSubTab('tax')}>Налоговые отчёты</button>
             <button className={`stab${repSubTab === 'stat' ? ' active' : ''}`} onClick={() => setRepSubTab('stat')}>Статистические отчёты</button>
           </div>
+          <select value={repYear} onChange={e => setRepYear(+e.target.value)} style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#111827' }}>
+            <option value={2025}>2025 год</option>
+            <option value={2026}>2026 год</option>
+            <option value={2027}>2027 год</option>
+          </select>
           <button className="btn-sm" onClick={exportRepCSV} style={{ marginLeft: 'auto', background: '#fff', color: '#6366f1', border: '1px solid #c7d2fe' }}>⬇ Скачать отчёт</button>
         </div>
         <div className="ff" style={{ marginBottom: 9 }}>
@@ -842,10 +861,12 @@ export default function DashboardPage() {
           reports={repSubTab === 'tax' ? reps.tax : reps.stat}
           repDone={repDone}
           taxDone={taxDone}
+          repYear={repYear}
           repQ={repQ} repReg={repReg} repStatus={repStatus}
           onToggleRep={toggleRep}
           onToggleMonthTax={toggleMonthTax}
           onEditCompany={(name) => { const co = companies.find(c => c.n === name); if (co) { setEditCoData({ ...co }); setEditCoIdx(companies.findIndex(c => c.n === name)) } }}
+          QLABELS={QLABELS}
         />
       </div>
 
@@ -1012,12 +1033,14 @@ export default function DashboardPage() {
 }
 
 // ─── КОМПОНЕНТ: НАЛОГИ ──────────────────
-function TaxSection({ companies, taxDone, taxMonth, taxFreq, onToggle, taxComments, onComment }: {
-  companies: Company[]; taxDone: Record<string, boolean>; taxMonth: number; taxFreq: string
+function TaxSection({ companies, taxDone, taxMonth, taxYear, taxFreq, onToggle, taxComments, onComment }: {
+  companies: Company[]; taxDone: Record<string, boolean>; taxMonth: number; taxYear: number; taxFreq: string
   onToggle: (key: string) => void; taxComments: Record<string, string>; onComment: (key: string, val: string) => void
 }) {
   const MN = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
   const prevMonth = taxMonth === 1 ? 12 : taxMonth - 1
+  const prevYear = taxMonth === 1 ? taxYear - 1 : taxYear
+  const mk = (co: string) => `${co}|main|${taxYear}-${taxMonth - 1}`
   const grps = [
     { label: 'Ежедневные', freq: 'Ежедневная', color: '#1d4ed8', bg: '#eff6ff' },
     { label: 'Раз в месяц', freq: 'Раз в месяц', color: '#065f46', bg: '#d1fae5' },
@@ -1028,13 +1051,13 @@ function TaxSection({ companies, taxDone, taxMonth, taxFreq, onToggle, taxCommen
   return (
     <div>
       <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10, padding: '6px 10px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
-        Период: <strong>за {MN[prevMonth]} 2026</strong> — налоги уплатить до <strong>25 {MN[taxMonth]} 2026</strong>
+        Период: <strong>за {MN[prevMonth]} {prevYear}</strong> — налоги уплатить до <strong>25 {MN[taxMonth]} {taxYear}</strong>
       </div>
       {grps.map(g => {
         if (taxFreq && taxFreq !== g.freq) return null
-        const rows = companies.filter(c => c.freq === g.freq && getTaxTypes(c.reg).length > 0)
+        const rows = companies.filter(c => c.freq === g.freq)
         if (!rows.length) return null
-        const dn = rows.filter(c => taxDone[`${c.n}|main|${taxMonth - 1}`]).length
+        const dn = rows.filter(c => taxDone[mk(c.n)]).length
         return (
           <div key={g.freq} className="tgrp">
             <div className="tgrp-t">
@@ -1044,9 +1067,9 @@ function TaxSection({ companies, taxDone, taxMonth, taxFreq, onToggle, taxCommen
               <span style={{ color: '#94a3b8', fontWeight: 400 }}>· до 25 {MN[taxMonth]}</span>
             </div>
             {rows.map(c => {
-              const key = `${c.n}|main|${taxMonth - 1}`
+              const key = mk(c.n)
               const done = taxDone[key]
-              const cmtKey = `${c.n}|cmt|${taxMonth - 1}`
+              const cmtKey = `${c.n}|cmt|${taxYear}-${taxMonth - 1}`
               const cmt = taxComments[cmtKey] || ''
               return (
                 <div key={c.n} className="trow" style={{ flexWrap: 'wrap' as const, gap: 4 }}>
@@ -1072,11 +1095,11 @@ function TaxSection({ companies, taxDone, taxMonth, taxFreq, onToggle, taxCommen
 }
 
 // ─── КОМПОНЕНТ: ОТЧЁТНОСТЬ ──────────────
-function ReportsSection({ reports, repDone, taxDone, repQ, repReg, repStatus, onToggleRep, onToggleMonthTax, onEditCompany }: {
+function ReportsSection({ reports, repDone, taxDone, repYear, repQ, repReg, repStatus, onToggleRep, onToggleMonthTax, onEditCompany, QLABELS }: {
   reports: RepEntry[]; repDone: Record<string, boolean>; taxDone: Record<string, boolean>
-  repQ: string; repReg: string; repStatus: string
+  repYear: number; repQ: string; repReg: string; repStatus: string
   onToggleRep: (key: string) => void; onToggleMonthTax: (key: string) => void
-  onEditCompany: (name: string) => void
+  onEditCompany: (name: string) => void; QLABELS: Record<string, string>
 }) {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   function dlLocal(d: string) {
@@ -1084,12 +1107,13 @@ function ReportsSection({ reports, repDone, taxDone, repQ, repReg, repStatus, on
     return Math.round((x.getTime() - today.getTime()) / 86400000)
   }
 
+  const rKey = (r: RepEntry) => `${r.co}|${r.type}|${r.q}|${repYear}`
+  const mKey = (co: string, m: number) => `${co}|main|${repYear}-${m}`
   const list = reports.filter(r => {
     if (repReg && r.reg !== repReg) return false
     if (repQ && r.q !== repQ) return false
-    const key = `${r.co}|${r.type}|${r.q}`
-    if (repStatus === 'done' && !repDone[key]) return false
-    if (repStatus === 'pending' && repDone[key]) return false
+    if (repStatus === 'done' && !repDone[rKey(r)]) return false
+    if (repStatus === 'pending' && repDone[rKey(r)]) return false
     return true
   })
   const byQ: Record<string, RepEntry[]> = {}
@@ -1102,7 +1126,7 @@ function ReportsSection({ reports, repDone, taxDone, repQ, repReg, repStatus, on
         if (!items?.length) return null
         const months = QM[qKey] || []
         const tot = items.length
-        const dn = items.filter(r => repDone[`${r.co}|${r.type}|${r.q}`]).length
+        const dn = items.filter(r => repDone[rKey(r)]).length
         const has910 = items.some(r => r.type.includes('910'))
         return (
           <div key={qKey} className="q-block">
@@ -1127,8 +1151,8 @@ function ReportsSection({ reports, repDone, taxDone, repQ, repReg, repStatus, on
                 </thead>
                 <tbody>
                   {items.map((r, i) => {
-                    const rKey = `${r.co}|${r.type}|${r.q}`
-                    const done = repDone[rKey]
+                    const rowKey = rKey(r)
+                    const done = repDone[rowKey]
                     const d = dlLocal(r.due)
                     const dt = done ? '✓ сдан' : d < 0 ? `просроч.${Math.abs(d)}д` : `${d} дн.`
                     const tc = r.type.includes('910') ? 'bt' : r.type.includes('300') ? 'br' : r.type.includes('200') ? 'bp' : 'ba'
@@ -1145,17 +1169,17 @@ function ReportsSection({ reports, repDone, taxDone, repQ, repReg, repStatus, on
                         </td>
                         <td className="center"><span style={{ fontSize: 10, color: '#888780' }}>{r.due.slice(5)}</span></td>
                         <td className="center">
-                          <div className={`tax-cell ${done ? 'tax-paid' : 'tax-unpaid'}`} onClick={() => onToggleRep(rKey)} style={{ cursor: 'pointer' }}>
+                          <div className={`tax-cell ${done ? 'tax-paid' : 'tax-unpaid'}`} onClick={() => onToggleRep(rowKey)} style={{ cursor: 'pointer' }}>
                             {done ? '✓ сдан' : '✗ не сдан'}
                           </div>
                         </td>
                         {months.map(m => {
                           if (!r.months) return <td key={m} className="center"><span style={{ color: '#b4b2a9', fontSize: 10 }}>—</span></td>
-                          const mKey = `${r.co}|main|${m}`
-                          const paid = taxDone[mKey]
+                          const cellKey = mKey(r.co, m)
+                          const paid = taxDone[cellKey]
                           return (
                             <td key={m} className="center">
-                              <div className={`tax-cell ${paid ? 'tax-paid' : 'tax-unpaid'}`} style={{ minWidth: 0, fontSize: 9.5 }} onClick={() => onToggleMonthTax(mKey)}>
+                              <div className={`tax-cell ${paid ? 'tax-paid' : 'tax-unpaid'}`} style={{ minWidth: 0, fontSize: 9.5 }} onClick={() => onToggleMonthTax(cellKey)}>
                                 {paid ? '✓' : '✗'}
                               </div>
                             </td>
