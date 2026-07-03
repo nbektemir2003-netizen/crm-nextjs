@@ -153,6 +153,9 @@ export default function DashboardPage() {
   // Фильтры налогов
   const [taxMonth, setTaxMonth] = useState(7)
   const [taxFreq, setTaxFreq] = useState('')
+  const [taxSearch, setTaxSearch] = useState('')
+  const [taxCat, setTaxCat] = useState('')
+  const [taxReg, setTaxReg] = useState('')
   const [taxSubTab, setTaxSubTab] = useState<'main' | 'stat'>('main')
 
   // Фильтры отчётов
@@ -397,6 +400,36 @@ export default function DashboardPage() {
     const nd = { ...taxDone, [key]: !taxDone[key] }
     saveTaxDone(nd)
   }
+  function markAllTaxPaid() {
+    const nd = { ...taxDone }
+    taxAct.forEach(c => { nd[`${c.n}|main|${taxMonth - 1}`] = true })
+    saveTaxDone(nd)
+    showToast(`Отмечено ${taxAct.length} компаний ✓`)
+  }
+  function exportTaxCSV() {
+    const monthName = MN[taxMonth - 1]
+    const rows = ['﻿Компания,Режим,Группа,Статус']
+    taxAct.forEach(c => {
+      const paid = taxDone[`${c.n}|main|${taxMonth - 1}`] ? 'Уплачен' : 'Не уплачен'
+      rows.push(`"${c.n}","${c.reg}","${c.freq}","${paid}"`)
+    })
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = `налоги_${monthName}_2026.csv`; a.click()
+    URL.revokeObjectURL(url)
+  }
+  function exportRepCSV() {
+    const list = repSubTab === 'tax' ? taxReps : statReps
+    const rows = ['﻿Компания,Режим,Отчёт,Квартал,Срок,Статус']
+    list.forEach(r => {
+      const st = repDone[`${r.co}|${r.type}|${r.q}`] ? 'Сдан' : 'Не сдан'
+      rows.push(`"${r.co}","${r.reg}","${r.type}","${r.q}","${r.due}","${st}"`)
+    })
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = `отчётность_2026.csv`; a.click()
+    URL.revokeObjectURL(url)
+  }
 
   // ─── ПОЛЬЗОВАТЕЛИ ───────────────────────
   function addUser() {
@@ -434,7 +467,13 @@ export default function DashboardPage() {
     urgent: active.filter(t => t.prio === 'Срочно').length,
     overdue: active.filter(t => dl(t.date) < 0).length,
   }
-  const actCos = companies.filter(c => c.status === 'Активная' && ['Ежедневная', 'Раз в месяц', 'Квартальная'].includes(c.freq))
+  const actCos = companies.filter(c => {
+    if (c.status !== 'Активная') return false
+    if (taxSearch && !c.n.toLowerCase().includes(taxSearch.toLowerCase())) return false
+    if (taxCat && c.cat !== taxCat) return false
+    if (taxReg && !c.reg.includes(taxReg)) return false
+    return true
+  })
   const taxAct = taxFreq ? actCos.filter(c => c.freq === taxFreq) : actCos
   const stTax = {
     count: taxAct.length,
@@ -736,20 +775,36 @@ export default function DashboardPage() {
           )
         })()}
 
-        <div className="ff" style={{ marginBottom: 9 }}>
+        <div className="ff" style={{ marginBottom: 6 }}>
+          <input type="text" placeholder="Поиск компании..." value={taxSearch} onChange={e => setTaxSearch(e.target.value)} />
           <select value={taxMonth} onChange={e => setTaxMonth(+e.target.value)}>
             {[6, 7, 8, 9, 10, 11, 12].map(m => (
-              <option key={m} value={m}>
-                За {MN[m === 1 ? 12 : m - 1]} → до 25 {MN[m]} 2026
-              </option>
+              <option key={m} value={m}>За {MN[m - 1]} → до 25 {MN[m]} 2026</option>
             ))}
           </select>
           <select value={taxFreq} onChange={e => setTaxFreq(e.target.value)}>
             <option value="">Все группы</option>
-            <option value="Ежедневная">Ежедневные</option><option value="Раз в месяц">Раз в месяц</option><option value="Квартальная">Квартальные</option>
+            <option value="Ежедневная">Ежедневные</option>
+            <option value="Раз в месяц">Раз в месяц</option>
+            <option value="Квартальная">Квартальные</option>
+            <option value="Разовая">Разовые</option>
+            <option value="На закрытие">На закрытие</option>
+          </select>
+          <select value={taxCat} onChange={e => setTaxCat(e.target.value)}>
+            <option value="">Все категории</option>
+            <option>КАФЕШКИ</option><option>ПЕРЕПРОДАЖА</option><option>ПРОИЗВОДСТВО</option><option>СТРОИТЕЛЬСТВО</option><option>ПРОЧИЕ УСЛУГИ</option><option>ИП-ЖОО</option><option>Школы JOO</option><option>РАЗОВОЕ</option><option>ПРОЧЕЕ</option>
+          </select>
+          <select value={taxReg} onChange={e => setTaxReg(e.target.value)}>
+            <option value="">Все режимы</option>
+            <option value="НДС">ОУР (НДС)</option><option value="ОУР">ОУР</option><option value="УПРОЩЕНКА">Упрощёнка</option><option value="СНР">СНР</option><option value="КХ">КХ</option>
           </select>
         </div>
-        <TaxSection companies={companies} taxDone={taxDone} taxMonth={taxMonth} taxFreq={taxFreq} onToggle={toggleTax} taxComments={taxComments} onComment={saveTaxComment} />
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: '#6b7280' }}>Показано: {taxAct.length} компаний</span>
+          <button className="btn-sm" onClick={markAllTaxPaid} style={{ marginLeft: 'auto' }}>✓ Отметить всех уплачено</button>
+          <button className="btn-sm" onClick={exportTaxCSV} style={{ background: '#fff', color: '#6366f1', border: '1px solid #c7d2fe' }}>⬇ Скачать отчёт</button>
+        </div>
+        <TaxSection companies={taxAct} taxDone={taxDone} taxMonth={taxMonth} taxFreq={taxFreq} onToggle={toggleTax} taxComments={taxComments} onComment={saveTaxComment} />
       </div>
 
       {/* ═══════════════ ОТЧЁТНОСТЬ ═══════════════ */}
@@ -762,9 +817,12 @@ export default function DashboardPage() {
           <div className="stat s-green"><div className="sl">Стат. сдано</div><div className="sv green">{stRep.statDone}</div></div>
           <div className="stat s-red"><div className="sl">Просрочено</div><div className="sv red">{stRep.overdue}</div></div>
         </div>
-        <div className="stabs">
-          <button className={`stab${repSubTab === 'tax' ? ' active' : ''}`} onClick={() => setRepSubTab('tax')}>Налоговые отчёты</button>
-          <button className={`stab${repSubTab === 'stat' ? ' active' : ''}`} onClick={() => setRepSubTab('stat')}>Статистические отчёты</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' as const }}>
+          <div className="stabs" style={{ marginBottom: 0 }}>
+            <button className={`stab${repSubTab === 'tax' ? ' active' : ''}`} onClick={() => setRepSubTab('tax')}>Налоговые отчёты</button>
+            <button className={`stab${repSubTab === 'stat' ? ' active' : ''}`} onClick={() => setRepSubTab('stat')}>Статистические отчёты</button>
+          </div>
+          <button className="btn-sm" onClick={exportRepCSV} style={{ marginLeft: 'auto', background: '#fff', color: '#6366f1', border: '1px solid #c7d2fe' }}>⬇ Скачать отчёт</button>
         </div>
         <div className="ff" style={{ marginBottom: 9 }}>
           <select value={repQ} onChange={e => setRepQ(e.target.value)}>
@@ -787,6 +845,7 @@ export default function DashboardPage() {
           repQ={repQ} repReg={repReg} repStatus={repStatus}
           onToggleRep={toggleRep}
           onToggleMonthTax={toggleMonthTax}
+          onEditCompany={(name) => { const co = companies.find(c => c.n === name); if (co) { setEditCoData({ ...co }); setEditCoIdx(companies.findIndex(c => c.n === name)) } }}
         />
       </div>
 
@@ -963,6 +1022,8 @@ function TaxSection({ companies, taxDone, taxMonth, taxFreq, onToggle, taxCommen
     { label: 'Ежедневные', freq: 'Ежедневная', color: '#1d4ed8', bg: '#eff6ff' },
     { label: 'Раз в месяц', freq: 'Раз в месяц', color: '#065f46', bg: '#d1fae5' },
     { label: 'Квартальные', freq: 'Квартальная', color: '#6d28d9', bg: '#ede9fe' },
+    { label: 'Разовые', freq: 'Разовая', color: '#92400e', bg: '#fef3c7' },
+    { label: 'На закрытие', freq: 'На закрытие', color: '#7f1d1d', bg: '#fee2e2' },
   ]
   return (
     <div>
@@ -971,7 +1032,7 @@ function TaxSection({ companies, taxDone, taxMonth, taxFreq, onToggle, taxCommen
       </div>
       {grps.map(g => {
         if (taxFreq && taxFreq !== g.freq) return null
-        const rows = companies.filter(c => c.freq === g.freq && c.status === 'Активная' && getTaxTypes(c.reg).length > 0)
+        const rows = companies.filter(c => c.freq === g.freq && getTaxTypes(c.reg).length > 0)
         if (!rows.length) return null
         const dn = rows.filter(c => taxDone[`${c.n}|main|${taxMonth - 1}`]).length
         return (
@@ -1011,10 +1072,11 @@ function TaxSection({ companies, taxDone, taxMonth, taxFreq, onToggle, taxCommen
 }
 
 // ─── КОМПОНЕНТ: ОТЧЁТНОСТЬ ──────────────
-function ReportsSection({ reports, repDone, taxDone, repQ, repReg, repStatus, onToggleRep, onToggleMonthTax }: {
+function ReportsSection({ reports, repDone, taxDone, repQ, repReg, repStatus, onToggleRep, onToggleMonthTax, onEditCompany }: {
   reports: RepEntry[]; repDone: Record<string, boolean>; taxDone: Record<string, boolean>
   repQ: string; repReg: string; repStatus: string
   onToggleRep: (key: string) => void; onToggleMonthTax: (key: string) => void
+  onEditCompany: (name: string) => void
 }) {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   function dlLocal(d: string) {
@@ -1073,7 +1135,9 @@ function ReportsSection({ reports, repDone, taxDone, repQ, repReg, repStatus, on
                     const sk = done ? { textDecoration: 'line-through' as const, color: '#b4b2a9' } : {}
                     return (
                       <tr key={i}>
-                        <td style={{ fontWeight: 500, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', ...sk }} title={r.co}>{r.co}</td>
+                        <td style={{ fontWeight: 500, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', ...sk }} title={`${r.co} — нажмите для редактирования`}>
+                          <span style={{ cursor: 'pointer', borderBottom: '1px dashed #c7d2fe', color: done ? '#b4b2a9' : '#4f46e5' }} onClick={() => onEditCompany(r.co)}>{r.co}</span>
+                        </td>
                         <td>{regBadge(r.reg)}</td>
                         <td>
                           <span className={`b ${tc}`} style={{ fontSize: 9 }}>{r.type.split(' ')[0]}</span>{' '}
