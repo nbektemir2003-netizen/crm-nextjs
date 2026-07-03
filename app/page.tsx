@@ -712,18 +712,26 @@ export default function DashboardPage() {
         {/* Мини-анализ рисков */}
         {stTax.count - stTax.mainPaid > 0 && (() => {
           const unpaid = taxAct.filter(c => !taxDone[`${c.n}|main|${taxMonth - 1}`])
+          const high = unpaid.filter(c => c.risk === 'высокая')
+          const mid = unpaid.filter(c => c.risk === 'средняя')
+          const low = unpaid.filter(c => c.risk === 'низкая')
           return (
             <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#c2410c', marginBottom: 6 }}>
-                ⚠️ Не уплачено налогов: {unpaid.length} компании
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' as const }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#c2410c' }}>⚠️ Не уплачено: {unpaid.length}</span>
+                {high.length > 0 && <span style={{ fontSize: 11, fontWeight: 600, color: '#991b1b', background: '#fee2e2', borderRadius: 6, padding: '2px 8px', border: '1px solid #fecaca' }}>🔴 Высокий риск: {high.length}</span>}
+                {mid.length > 0 && <span style={{ fontSize: 11, fontWeight: 600, color: '#92400e', background: '#fef3c7', borderRadius: 6, padding: '2px 8px', border: '1px solid #fde68a' }}>🟡 Средний: {mid.length}</span>}
+                {low.length > 0 && <span style={{ fontSize: 11, color: '#065f46', background: '#d1fae5', borderRadius: 6, padding: '2px 8px', border: '1px solid #a7f3d0' }}>🟢 Низкий: {low.length}</span>}
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 5 }}>
-                {unpaid.map(c => (
-                  <span key={c.n} style={{ fontSize: 10.5, background: '#fee2e2', color: '#991b1b', borderRadius: 6, padding: '2px 8px', border: '1px solid #fecaca' }}>
-                    {c.n} <span style={{ color: '#b45309', fontWeight: 500 }}>· {c.risk === 'высокая' ? '🔴 выс. риск' : c.risk === 'средняя' ? '🟡 средн.' : '🟢 низк.'}</span>
-                  </span>
-                ))}
-              </div>
+              {high.length > 0 && (
+                <div style={{ marginTop: 7, display: 'flex', flexWrap: 'wrap' as const, gap: 5 }}>
+                  {high.map(c => (
+                    <span key={c.n} style={{ fontSize: 10.5, background: '#fee2e2', color: '#991b1b', borderRadius: 6, padding: '2px 8px', border: '1px solid #fecaca', fontWeight: 500 }}>
+                      🔴 {c.n}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )
         })()}
@@ -965,7 +973,7 @@ function TaxSection({ companies, taxDone, taxMonth, taxFreq, onToggle, taxCommen
         if (taxFreq && taxFreq !== g.freq) return null
         const rows = companies.filter(c => c.freq === g.freq && c.status === 'Активная' && getTaxTypes(c.reg).length > 0)
         if (!rows.length) return null
-        const dn = rows.filter(c => taxDone[`${c.n}|main|${taxMonth}`]).length
+        const dn = rows.filter(c => taxDone[`${c.n}|main|${taxMonth - 1}`]).length
         return (
           <div key={g.freq} className="tgrp">
             <div className="tgrp-t">
