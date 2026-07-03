@@ -620,7 +620,7 @@ export default function DashboardPage() {
 
       {/* ═══════════════ ЗАДАЧИ ═══════════════ */}
       <div className={`crm-sec${tab === 'tasks' ? ' active' : ''}`}>
-        {!isAdmin && <div className="ibox" style={{ marginBottom: 10, color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe' }}>Показаны только ваши задачи. Задачи других сотрудников видит только администратор.</div>}
+        {!isAdmin && <div className="ibox">Показаны только ваши задачи. Задачи других сотрудников видит только администратор.</div>}
         <div className="srow">
           <div className="stat s-indigo"><div className="sl">Всего</div><div className="sv">{stTasks.total}</div></div>
           <div className="stat s-sky"><div className="sl">В работе</div><div className="sv amber">{stTasks.active}</div></div>
