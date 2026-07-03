@@ -6,7 +6,7 @@ import { useEffect, useState, useCallback } from 'react'
 // ─── ТИПЫ ───────────────────────────────
 type Company = { id?: string; n: string; freq: string; reg: string; cat: string; b: string; risk: string; nds: boolean; status: string; skipReports: string[]; extraReports: string[] }
 type Task = { id?: string; co: string; desc: string; emp: string; prio: string; date: string; st: string }
-type TabId = 'co' | 'tasks' | 'tax' | 'rep' | 'add'
+type TabId = 'co' | 'tasks' | 'tax' | 'rep'
 type SyncCls = '' | 'syncing' | 'error'
 
 // ─── КОНСТАНТЫ ──────────────────────────
@@ -189,6 +189,10 @@ export default function DashboardPage() {
   const [showNotif, setShowNotif] = useState(false)
   const [showEditUsers, setShowEditUsers] = useState(false)
   const [newUserName, setNewUserName] = useState('')
+  const [showAddCo, setShowAddCo] = useState(false)
+  const [taxComments, setTaxComments] = useState<Record<string, string>>({})
+  const [coPhones, setCoPhones] = useState<Record<string, string>>({})
+  const [coTaxContacts, setCoTaxContacts] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
@@ -206,6 +210,12 @@ export default function DashboardPage() {
     if (td) try { setTaxDone(JSON.parse(td)) } catch {}
     const rd = localStorage.getItem('crm_repDone')
     if (rd) try { setRepDone(JSON.parse(rd)) } catch {}
+    const tc = localStorage.getItem('crm_taxComments')
+    if (tc) try { setTaxComments(JSON.parse(tc)) } catch {}
+    const cp = localStorage.getItem('crm_coPhones')
+    if (cp) try { setCoPhones(JSON.parse(cp)) } catch {}
+    const ct = localStorage.getItem('crm_coTaxContacts')
+    if (ct) try { setCoTaxContacts(JSON.parse(ct)) } catch {}
   }, [])
 
   async function loadData() {
@@ -232,6 +242,19 @@ export default function DashboardPage() {
   function saveRepDone(rd: Record<string, boolean>) {
     setRepDone(rd)
     localStorage.setItem('crm_repDone', JSON.stringify(rd))
+  }
+
+  function saveTaxComment(key: string, val: string) {
+    const nc = { ...taxComments, [key]: val }
+    setTaxComments(nc); localStorage.setItem('crm_taxComments', JSON.stringify(nc))
+  }
+  function saveCoPhone(id: string, val: string) {
+    const n = { ...coPhones, [id]: val }
+    setCoPhones(n); localStorage.setItem('crm_coPhones', JSON.stringify(n))
+  }
+  function saveCoTaxContact(id: string, val: string) {
+    const n = { ...coTaxContacts, [id]: val }
+    setCoTaxContacts(n); localStorage.setItem('crm_coTaxContacts', JSON.stringify(n))
   }
 
   // ─── КОМПАНИИ ───────────────────────────
@@ -310,6 +333,7 @@ export default function DashboardPage() {
 
   // ─── ЗАДАЧИ ─────────────────────────────
   const filteredTasks = tasks.filter(t => {
+    if (!isAdmin && t.emp !== userName) return false
     if (taskQ && !t.co.toLowerCase().includes(taskQ.toLowerCase()) && !t.desc.toLowerCase().includes(taskQ.toLowerCase())) return false
     if (taskEmp && t.emp !== taskEmp) return false
     if (taskPrio && t.prio !== taskPrio) return false
@@ -385,6 +409,8 @@ export default function DashboardPage() {
 
   // ─── УВЕДОМЛЕНИЯ ────────────────────────
   const userName = (session?.user as any)?.name || ''
+  const userRole = (session?.user as any)?.role || 'employee'
+  const isAdmin = userRole === 'admin'
   const myTasks = tasks.filter(t => t.emp === userName && t.st === 'В работе')
   const myDone = tasks.filter(t => t.emp === userName && t.st === 'Выполнено')
 
@@ -450,7 +476,7 @@ export default function DashboardPage() {
         </div>
 
         <nav className="crm-sidebar-nav">
-          {([['co', 'ti-building', 'Компании'], ['tasks', 'ti-checklist', 'Задачи'], ['tax', 'ti-cash', 'Налоги до 25-го'], ['rep', 'ti-file-check', 'Отчётность'], ['add', 'ti-plus', 'Добавить']] as [TabId, string, string][]).map(([id, icon, label]) => (
+          {([['co', 'ti-building', 'Компании'], ['tasks', 'ti-checklist', 'Задачи'], ['tax', 'ti-cash', 'Налоги'], ['rep', 'ti-file-check', 'Отчётность']] as [TabId, string, string][]).map(([id, icon, label]) => (
             <button key={id} className={`crm-tab${tab === id ? ' active' : ''}`} onClick={() => setTab(id)}>
               <i className={`ti ${icon}`}></i>{label}
             </button>
@@ -473,7 +499,7 @@ export default function DashboardPage() {
         {/* Топбар */}
         <div className="crm-topbar">
           <span className="crm-topbar-title">
-            {tab === 'co' ? 'Компании' : tab === 'tasks' ? 'Задачи' : tab === 'tax' ? 'Налоги до 25-го' : tab === 'rep' ? 'Отчётность' : 'Добавить компанию'}
+            {tab === 'co' ? 'Компании' : tab === 'tasks' ? 'Задачи' : tab === 'tax' ? 'Налоги' : 'Отчётность'}
           </span>
           <div className="crm-topbar-actions">
             <span className={`sync-status ${syncCls}`}>{syncText}</span>
@@ -490,14 +516,71 @@ export default function DashboardPage() {
 
       {/* ═══════════════ КОМПАНИИ ═══════════════ */}
       <div className={`crm-sec${tab === 'co' ? ' active' : ''}`}>
-        <div className="srow">
-          <div className="stat s-indigo"><div className="sl">Всего</div><div className="sv">{stCo.total}</div></div>
-          <div className="stat s-sky"><div className="sl">Ежедневные</div><div className="sv">{stCo.daily}</div></div>
-          <div className="stat s-sky"><div className="sl">Раз в месяц</div><div className="sv">{stCo.monthly}</div></div>
-          <div className="stat s-purple"><div className="sl">Квартальные</div><div className="sv">{stCo.quarterly}</div></div>
-          <div className="stat s-amber"><div className="sl">Разовые</div><div className="sv">{stCo.once}</div></div>
-          <div className="stat s-red"><div className="sl">На закрытие</div><div className="sv red">{stCo.closing}</div></div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div className="srow" style={{ flex: 1, margin: 0 }}>
+            <div className="stat s-indigo"><div className="sl">Всего</div><div className="sv">{stCo.total}</div></div>
+            <div className="stat s-sky"><div className="sl">Ежедневные</div><div className="sv">{stCo.daily}</div></div>
+            <div className="stat s-sky"><div className="sl">Раз в месяц</div><div className="sv">{stCo.monthly}</div></div>
+            <div className="stat s-purple"><div className="sl">Квартальные</div><div className="sv">{stCo.quarterly}</div></div>
+            <div className="stat s-amber"><div className="sl">Разовые</div><div className="sv">{stCo.once}</div></div>
+            <div className="stat s-red"><div className="sl">На закрытие</div><div className="sv red">{stCo.closing}</div></div>
+          </div>
+          <button className="btn" style={{ marginLeft: 12, whiteSpace: 'nowrap', flexShrink: 0 }} onClick={() => setShowAddCo(v => !v)}>
+            <i className="ti ti-plus" style={{ marginRight: 4 }}></i>{showAddCo ? 'Скрыть' : 'Добавить компанию'}
+          </button>
         </div>
+
+        {/* Форма добавления (показывается по кнопке) */}
+        {showAddCo && (
+          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, marginBottom: 14, boxShadow: '0 1px 3px rgba(15,23,42,.06)' }}>
+            <div className="ftitle" style={{ marginBottom: 12 }}>Новая компания</div>
+            <div className="fr">
+              <div className="fg"><label>Наименование *</label><input type="text" placeholder="ТОО / ИП ..." value={newCoName} onChange={e => setNewCoName(e.target.value)} /></div>
+              <div className="fg"><label>БИН / ИИН</label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input type="text" placeholder="12 цифр" maxLength={12} value={newCoBin} onChange={e => setNewCoBin(e.target.value.replace(/\D/g, ''))} style={{ flex: 1 }} />
+                  <button type="button" className="btn" style={{ padding: '4px 12px', fontSize: 11, whiteSpace: 'nowrap' }} onClick={lookupBin} disabled={newCoBinLoading}>{newCoBinLoading ? '...' : 'Найти'}</button>
+                </div>
+              </div>
+            </div>
+            <div className="fr3">
+              <div className="fg"><label>Режим *</label>
+                <input list="reg-list" placeholder="ОУР, УПРОЩЕНКА..." value={newCoReg} onChange={e => setNewCoReg(e.target.value)} />
+                <datalist id="reg-list"><option value="ОУР (НДС)" /><option value="ОУР" /><option value="УПРОЩЕНКА" /><option value="СНР" /><option value="КХ" /></datalist>
+              </div>
+              <div className="fg"><label>Группа *</label>
+                <input list="freq-list" placeholder="Ежедневная..." value={newCoFreq} onChange={e => setNewCoFreq(e.target.value)} />
+                <datalist id="freq-list"><option value="Ежедневная" /><option value="Раз в месяц" /><option value="Квартальная" /><option value="Разовая" /><option value="На закрытие" /></datalist>
+              </div>
+              <div className="fg"><label>Категория</label>
+                <input list="cat-list" placeholder="КАФЕШКИ, ИП-ЖОО..." value={newCoCat} onChange={e => setNewCoCat(e.target.value)} />
+                <datalist id="cat-list"><option value="КАФЕШКИ" /><option value="ПЕРЕПРОДАЖА" /><option value="ПРОИЗВОДСТВО" /><option value="СТРОИТЕЛЬСТВО" /><option value="ПРОЧИЕ УСЛУГИ" /><option value="ИП-ЖОО" /><option value="Школы JOO" /><option value="РАЗОВОЕ" /><option value="ПРОЧЕЕ" /></datalist>
+              </div>
+            </div>
+            <div className="fr">
+              <div className="fg"><label>1С база</label>
+                <select value={newCoBase} onChange={e => setNewCoBase(e.target.value)}><option value="БАР">ЕСТЬ</option><option value="ЖОҚ">НЕТ</option></select>
+              </div>
+              <div className="fg"><label>Риск</label>
+                <select value={newCoRisk} onChange={e => setNewCoRisk(e.target.value)}><option>низкая</option><option>средняя</option><option>высокая</option></select>
+              </div>
+              <div className="fg"><label>Статус</label>
+                <select value={newCoStatus} onChange={e => setNewCoStatus(e.target.value)}>
+                  <option value="Активная">Активная</option><option value="Приостановлена">Приостановлена</option><option value="На закрытие">На закрытие</option>
+                </select>
+              </div>
+            </div>
+            <div className="ibox" style={{ marginBottom: 10 }}>
+              {newCoReg ? ({ 'ОУР (НДС)': '300.00 (кварт.) · 200.00 (кварт.) · 100.00 (год.)', 'ОУР': '200.00 (кварт.) · 100.00 (год.)', 'УПРОЩЕНКА': '910.00 (2 и 4 кв.) · 200.00 (кварт.)', 'СНР': '910.00 (2 и 4 кв.) · 200.00 (кварт.)', 'КХ': '920.00 (год.)' }[newCoReg] || 'Выберите режим') : 'Выберите режим — отчёты создадутся автоматически'}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn" onClick={() => { addCo(); setShowAddCo(false) }}>Добавить</button>
+              <button className="btn-warn" style={{ background: 'transparent' }} onClick={() => setShowAddCo(false)}>Отмена</button>
+            </div>
+            {addMsg && <div style={{ fontSize: 11, color: '#16a34a', marginTop: 8, fontWeight: 500 }}>{addMsg}</div>}
+          </div>
+        )}
+
         <div className="ff">
           <input type="text" placeholder="Поиск компании..." value={coQ} onChange={e => setCoQ(e.target.value)} />
           <select value={coFreq} onChange={e => setCoFreq(e.target.value)}>
@@ -506,7 +589,7 @@ export default function DashboardPage() {
           </select>
           <select value={coCat} onChange={e => setCoCat(e.target.value)}>
             <option value="">Все категории</option>
-            <option>КАФЕШКИ</option><option>ПЕРЕПРОДАЖА</option><option>ПРОИЗВОДСТВО</option><option>СТРОИТЕЛЬСТВО</option><option>ПРОЧИЕ УСЛУГИ</option><option>ИП-ЖОО</option><option>Школы JOO</option><option>РАЗОВОЕ</option>
+            <option>КАФЕШКИ</option><option>ПЕРЕПРОДАЖА</option><option>ПРОИЗВОДСТВО</option><option>СТРОИТЕЛЬСТВО</option><option>ПРОЧИЕ УСЛУГИ</option><option>ИП-ЖОО</option><option>Школы JOO</option><option>РАЗОВОЕ</option><option>ПРОЧЕЕ</option>
           </select>
           <select value={coReg} onChange={e => setCoReg(e.target.value)}>
             <option value="">Все режимы</option>
@@ -515,15 +598,15 @@ export default function DashboardPage() {
         </div>
         <div className="tw">
           <table>
-            <colgroup><col style={{ width: '30%' }} /><col style={{ width: '14%' }} /><col style={{ width: '15%' }} /><col style={{ width: '15%' }} /><col style={{ width: '12%' }} /><col style={{ width: '14%' }} /></colgroup>
+            <colgroup><col style={{ width: '28%' }} /><col style={{ width: '13%' }} /><col style={{ width: '14%' }} /><col style={{ width: '15%' }} /><col style={{ width: '11%' }} /><col style={{ width: '11%' }} /></colgroup>
             <thead><tr><th>Организация</th><th>Группа</th><th>Режим</th><th>Категория</th><th>1С база</th><th>Риск</th><th style={{ width: 40 }}></th></tr></thead>
             <tbody>
               {filteredCos.map(c => (
                 <tr key={c.id || c.n} style={{ cursor: 'pointer' }} onClick={() => { setEditCoData({ ...c }); setEditCoIdx(companies.findIndex(x => x.n === c.n)) }}>
                   <td style={{ fontWeight: 500, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }} title={c.n}>{c.n}</td>
-                  <td><span className={`b ${FC[c.freq] || 'bk'}`}>{c.freq}</span></td>
+                  <td><span className={`b bfreq-${(c.freq||'').split(' ')[0].toLowerCase().replace(/[^a-zа-я]/g,'')}`} style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 99, fontSize: 10, padding: '2px 7px', whiteSpace: 'nowrap' as const }}>{c.freq}</span></td>
                   <td>{regBadge(c.reg)}</td>
-                  <td style={{ fontSize: 10.5, color: '#5f5e5a' }}>{c.cat}</td>
+                  <td style={{ fontSize: 10.5, color: '#64748b' }}>{c.cat}</td>
                   <td>{c.b === 'БАР' ? <span className="b bg">есть</span> : <span className="b bk">нет</span>}</td>
                   <td>{c.risk === 'высокая' ? <span className="b br">выс.</span> : c.risk === 'средняя' ? <span className="b ba">средн.</span> : <span className="b bg">низк.</span>}</td>
                   <td><button className="btn-del" onClick={e => { e.stopPropagation(); deleteCo(c) }}>✕</button></td>
@@ -537,6 +620,7 @@ export default function DashboardPage() {
 
       {/* ═══════════════ ЗАДАЧИ ═══════════════ */}
       <div className={`crm-sec${tab === 'tasks' ? ' active' : ''}`}>
+        {!isAdmin && <div className="ibox" style={{ marginBottom: 10, color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe' }}>Показаны только ваши задачи. Задачи других сотрудников видит только администратор.</div>}
         <div className="srow">
           <div className="stat s-indigo"><div className="sl">Всего</div><div className="sv">{stTasks.total}</div></div>
           <div className="stat s-sky"><div className="sl">В работе</div><div className="sv amber">{stTasks.active}</div></div>
@@ -619,22 +703,43 @@ export default function DashboardPage() {
       <div className={`crm-sec${tab === 'tax' ? ' active' : ''}`}>
         <div className="srow">
           <div className="stat s-indigo"><div className="sl">Компаний</div><div className="sv">{stTax.count}</div></div>
-          <div className="stat s-green"><div className="sl">Нал. уплачено</div><div className="sv green">{stTax.mainPaid}</div></div>
-          <div className="stat s-red"><div className="sl">Нал. не уплачено</div><div className="sv red">{stTax.count - stTax.mainPaid}</div></div>
+          <div className="stat s-green"><div className="sl">Уплачено</div><div className="sv green">{stTax.mainPaid}</div></div>
+          <div className="stat s-red"><div className="sl">Не уплачено</div><div className="sv red">{stTax.count - stTax.mainPaid}</div></div>
         </div>
-        <div className="stabs">
-          <button className={`stab${taxSubTab === 'main' ? ' active' : ''}`} onClick={() => setTaxSubTab('main')}>Налоговые платежи</button>
-        </div>
+
+        {/* Мини-анализ рисков */}
+        {stTax.count - stTax.mainPaid > 0 && (() => {
+          const unpaid = taxAct.filter(c => !taxDone[`${c.n}|main|${taxMonth}`])
+          return (
+            <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#c2410c', marginBottom: 6 }}>
+                ⚠️ Не уплачено налогов: {unpaid.length} компании
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 5 }}>
+                {unpaid.map(c => (
+                  <span key={c.n} style={{ fontSize: 10.5, background: '#fee2e2', color: '#991b1b', borderRadius: 6, padding: '2px 8px', border: '1px solid #fecaca' }}>
+                    {c.n} <span style={{ color: '#b45309', fontWeight: 500 }}>· {c.risk === 'высокая' ? '🔴 выс. риск' : c.risk === 'средняя' ? '🟡 средн.' : '🟢 низк.'}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
+
         <div className="ff" style={{ marginBottom: 9 }}>
           <select value={taxMonth} onChange={e => setTaxMonth(+e.target.value)}>
-            {[6, 7, 8, 9, 10, 11, 12].map(m => <option key={m} value={m}>{MN[m]} 2026</option>)}
+            {[6, 7, 8, 9, 10, 11, 12].map(m => (
+              <option key={m} value={m}>
+                За {MN[m === 1 ? 12 : m - 1]} → до 25 {MN[m]} 2026
+              </option>
+            ))}
           </select>
           <select value={taxFreq} onChange={e => setTaxFreq(e.target.value)}>
             <option value="">Все группы</option>
             <option value="Ежедневная">Ежедневные</option><option value="Раз в месяц">Раз в месяц</option><option value="Квартальная">Квартальные</option>
           </select>
         </div>
-        <TaxSection companies={companies} taxDone={taxDone} taxMonth={taxMonth} taxFreq={taxFreq} onToggle={toggleTax} />
+        <TaxSection companies={companies} taxDone={taxDone} taxMonth={taxMonth} taxFreq={taxFreq} onToggle={toggleTax} taxComments={taxComments} onComment={saveTaxComment} />
       </div>
 
       {/* ═══════════════ ОТЧЁТНОСТЬ ═══════════════ */}
@@ -675,73 +780,6 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* ═══════════════ ДОБАВИТЬ ═══════════════ */}
-      <div className={`crm-sec${tab === 'add' ? ' active' : ''}`}>
-        <div className="ftitle">Добавить новую компанию</div>
-        <div className="fr">
-          <div className="fg"><label>Наименование *</label><input type="text" placeholder="ТОО / ИП ..." value={newCoName} onChange={e => setNewCoName(e.target.value)} /></div>
-          <div className="fg"><label>БИН / ИИН</label>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <input type="text" placeholder="12 цифр" maxLength={12} value={newCoBin} onChange={e => setNewCoBin(e.target.value.replace(/\D/g, ''))} style={{ flex: 1 }} />
-              <button type="button" className="btn" style={{ padding: '4px 12px', fontSize: 11, whiteSpace: 'nowrap' }} onClick={lookupBin} disabled={newCoBinLoading}>
-                {newCoBinLoading ? '...' : 'Найти'}
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="fr3">
-          <div className="fg"><label>Режим *</label>
-            <input list="reg-list" placeholder="ОУР, УПРОЩЕНКА..." value={newCoReg} onChange={e => setNewCoReg(e.target.value)} />
-            <datalist id="reg-list"><option value="ОУР (НДС)" /><option value="ОУР" /><option value="УПРОЩЕНКА" /><option value="СНР" /><option value="КХ" /></datalist>
-          </div>
-          <div className="fg"><label>НДС плательщик</label>
-            <select value={newCoNds} onChange={e => setNewCoNds(e.target.value)}>
-              <option value="нет">Нет</option><option value="да">Да</option>
-            </select>
-          </div>
-          <div className="fg"><label>Группа обслуживания *</label>
-            <input list="freq-list" placeholder="Ежедневная..." value={newCoFreq} onChange={e => setNewCoFreq(e.target.value)} />
-            <datalist id="freq-list"><option value="Ежедневная" /><option value="Раз в месяц" /><option value="Квартальная" /><option value="Разовая" /><option value="На закрытие" /></datalist>
-          </div>
-        </div>
-        <div className="fr">
-          <div className="fg"><label>Категория *</label>
-            <input list="cat-list" placeholder="КАФЕШКИ, ИП-ЖОО..." value={newCoCat} onChange={e => setNewCoCat(e.target.value)} />
-            <datalist id="cat-list"><option value="КАФЕШКИ" /><option value="ПЕРЕПРОДАЖА" /><option value="ПРОИЗВОДСТВО" /><option value="СТРОИТЕЛЬСТВО" /><option value="ПРОЧИЕ УСЛУГИ" /><option value="ИП-ЖОО" /><option value="Школы JOO" /><option value="РАЗОВОЕ" /></datalist>
-          </div>
-          <div className="fg"><label>Чем занимается</label><input type="text" placeholder="кафе, доставка..." /></div>
-        </div>
-        <div className="fr">
-          <div className="fg"><label>1С база</label>
-            <select value={newCoBase} onChange={e => setNewCoBase(e.target.value)}>
-              <option value="БАР">ЕСТЬ</option><option value="ЖОҚ">НЕТ</option>
-            </select>
-          </div>
-          <div className="fg"><label>Степень риска</label>
-            <select value={newCoRisk} onChange={e => setNewCoRisk(e.target.value)}>
-              <option>низкая</option><option>средняя</option><option>высокая</option>
-            </select>
-          </div>
-        </div>
-        <div className="fr">
-          <div className="fg"><label>Статус</label>
-            <select value={newCoStatus} onChange={e => setNewCoStatus(e.target.value)}>
-              <option value="Активная">Активная</option><option value="Приостановлена">Приостановлена</option><option value="На закрытие">На закрытие</option>
-            </select>
-          </div>
-        </div>
-        <div className="ibox">
-          {newCoReg ? {
-            'ОУР (НДС)': '300.00 (каждый квартал) · 200.00 (каждый квартал) · 100.00 (годовая)',
-            'ОУР': '200.00 (каждый квартал) · 100.00 (годовая)',
-            'УПРОЩЕНКА': '910.00 (во 2 и 4 квартале) · 200.00 (каждый квартал)',
-            'СНР': '910.00 (во 2 и 4 квартале) · 200.00 (каждый квартал)',
-            'КХ': '920.00 (годовая)',
-          }[newCoReg] || 'Выберите режим — отчёты создадутся автоматически' : 'Выберите режим — отчёты создадутся автоматически'}
-        </div>
-        <button className="btn" onClick={addCo}>Добавить компанию</button>
-        {addMsg && <div style={{ fontSize: 11, color: '#3b6d11', marginTop: 8, fontWeight: 500 }}>{addMsg}</div>}
-      </div>
 
       {/* ═══════════════ МОДАЛ УВЕДОМЛЕНИЙ ═══════════════ */}
       {showNotif && (
@@ -813,7 +851,7 @@ export default function DashboardPage() {
             <div className="fr">
               <div className="fg"><label>Категория</label>
                 <input list="e-cat-list" value={editCoData.cat} onChange={e => setEditCoData(p => p ? { ...p, cat: e.target.value } : p)} />
-                <datalist id="e-cat-list"><option value="КАФЕШКИ" /><option value="ПЕРЕПРОДАЖА" /><option value="ПРОИЗВОДСТВО" /><option value="СТРОИТЕЛЬСТВО" /><option value="ПРОЧИЕ УСЛУГИ" /><option value="ИП-ЖОО" /><option value="Школы JOO" /><option value="РАЗОВОЕ" /></datalist>
+                <datalist id="e-cat-list"><option value="КАФЕШКИ" /><option value="ПЕРЕПРОДАЖА" /><option value="ПРОИЗВОДСТВО" /><option value="СТРОИТЕЛЬСТВО" /><option value="ПРОЧИЕ УСЛУГИ" /><option value="ИП-ЖОО" /><option value="Школы JOO" /><option value="РАЗОВОЕ" /><option value="ПРОЧЕЕ" /></datalist>
               </div>
               <div className="fg"><label>1С база</label>
                 <select value={editCoData.b} onChange={e => setEditCoData(p => p ? { ...p, b: e.target.value } : p)}>
@@ -831,6 +869,14 @@ export default function DashboardPage() {
                 <select value={editCoData.status} onChange={e => setEditCoData(p => p ? { ...p, status: e.target.value } : p)}>
                   <option value="Активная">Активная</option><option value="Приостановлена">Приостановлена</option><option value="На закрытие">На закрытие</option>
                 </select>
+              </div>
+            </div>
+            <div className="fr">
+              <div className="fg"><label>📞 Телефон директора</label>
+                <input type="text" placeholder="+7 ..." value={coPhones[editCoData.id || ''] || ''} onChange={e => saveCoPhone(editCoData.id || '', e.target.value)} />
+              </div>
+              <div className="fg"><label>🏛 Контакт налоговой</label>
+                <input type="text" placeholder="Телефон / имя инспектора" value={coTaxContacts[editCoData.id || ''] || ''} onChange={e => saveCoTaxContact(editCoData.id || '', e.target.value)} />
               </div>
             </div>
             <EditCoReports company={editCoData} onChange={setEditCoData} />
@@ -897,18 +943,22 @@ export default function DashboardPage() {
 }
 
 // ─── КОМПОНЕНТ: НАЛОГИ ──────────────────
-function TaxSection({ companies, taxDone, taxMonth, taxFreq, onToggle }: {
-  companies: Company[]; taxDone: Record<string, boolean>; taxMonth: number; taxFreq: string; onToggle: (key: string) => void
+function TaxSection({ companies, taxDone, taxMonth, taxFreq, onToggle, taxComments, onComment }: {
+  companies: Company[]; taxDone: Record<string, boolean>; taxMonth: number; taxFreq: string
+  onToggle: (key: string) => void; taxComments: Record<string, string>; onComment: (key: string, val: string) => void
 }) {
   const MN = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
-  const FC: Record<string, string> = { 'Ежедневная': 'bb', 'Раз в месяц': 'bt', 'Квартальная': 'bp' }
+  const prevMonth = taxMonth === 1 ? 12 : taxMonth - 1
   const grps = [
-    { label: 'Ежедневные', freq: 'Ежедневная' },
-    { label: 'Раз в месяц', freq: 'Раз в месяц' },
-    { label: 'Квартальные', freq: 'Квартальная' },
+    { label: 'Ежедневные', freq: 'Ежедневная', color: '#1d4ed8', bg: '#eff6ff' },
+    { label: 'Раз в месяц', freq: 'Раз в месяц', color: '#065f46', bg: '#d1fae5' },
+    { label: 'Квартальные', freq: 'Квартальная', color: '#6d28d9', bg: '#ede9fe' },
   ]
   return (
     <div>
+      <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10, padding: '6px 10px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+        Период: <strong>за {MN[prevMonth]}</strong> — налоги уплатить до <strong>25 {MN[taxMonth]}</strong>
+      </div>
       {grps.map(g => {
         if (taxFreq && taxFreq !== g.freq) return null
         const rows = companies.filter(c => c.freq === g.freq && c.status === 'Активная' && getTaxTypes(c.reg).length > 0)
@@ -917,19 +967,29 @@ function TaxSection({ companies, taxDone, taxMonth, taxFreq, onToggle }: {
         return (
           <div key={g.freq} className="tgrp">
             <div className="tgrp-t">
-              <span className={`b ${FC[g.freq]}`}>{g.label}</span>
-              <span style={{ color: '#3b6d11' }}>{dn}</span>/{rows.length} · до 25 {MN[taxMonth]}
+              <span style={{ background: g.bg, color: g.color, borderRadius: 99, fontSize: 10, padding: '2px 8px', fontWeight: 600 }}>{g.label}</span>
+              <span style={{ color: '#16a34a', fontWeight: 600 }}>{dn}</span>
+              <span style={{ color: '#64748b' }}>/{rows.length}</span>
+              <span style={{ color: '#94a3b8', fontWeight: 400 }}>· до 25 {MN[taxMonth]}</span>
             </div>
             {rows.map(c => {
               const key = `${c.n}|main|${taxMonth}`
               const done = taxDone[key]
+              const cmtKey = `${c.n}|cmt|${taxMonth}`
+              const cmt = taxComments[cmtKey] || ''
               return (
-                <div key={c.n} className="trow">
+                <div key={c.n} className="trow" style={{ flexWrap: 'wrap' as const, gap: 4 }}>
                   <input type="checkbox" className="chk" checked={!!done} onChange={() => onToggle(key)} />
                   {regBadge(c.reg)}
-                  <div className={`tname${done ? ' sk' : ''}`} style={{ marginLeft: 5 }}>{c.n}</div>
+                  <div className={`tname${done ? ' sk' : ''}`} style={{ marginLeft: 4 }}>{c.n}</div>
                   <div className="ttypes">{getTaxTypes(c.reg).join(' · ')}</div>
-                  <span className={`b ${done ? 'bg' : 'ba'}`}>{done ? 'уплачен' : 'до 25-го'}</span>
+                  <span className={`b ${done ? 'bg' : 'ba'}`} style={{ marginLeft: 'auto' }}>{done ? 'уплачен' : 'до 25-го'}</span>
+                  <input
+                    type="text" value={cmt}
+                    onChange={e => onComment(cmtKey, e.target.value)}
+                    placeholder="Комментарий (блок счёта, нет денег...)"
+                    style={{ width: '100%', fontSize: 11, padding: '3px 8px', border: '1px solid #e2e8f0', borderRadius: 5, color: '#b45309', background: cmt ? '#fffbeb' : '#f8fafc', marginTop: 2 }}
+                  />
                 </div>
               )
             })}
