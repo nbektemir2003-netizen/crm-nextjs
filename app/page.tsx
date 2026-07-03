@@ -331,6 +331,11 @@ export default function DashboardPage() {
     showToast(`"${newCoName}" добавлена в базу ✓`)
   }
 
+  // ─── РОЛЬ ───────────────────────────────
+  const userName = (session?.user as any)?.name || ''
+  const userRole = (session?.user as any)?.role || 'employee'
+  const isAdmin = userRole === 'admin'
+
   // ─── ЗАДАЧИ ─────────────────────────────
   const filteredTasks = tasks.filter(t => {
     if (!isAdmin && t.emp !== userName) return false
@@ -408,9 +413,6 @@ export default function DashboardPage() {
   }
 
   // ─── УВЕДОМЛЕНИЯ ────────────────────────
-  const userName = (session?.user as any)?.name || ''
-  const userRole = (session?.user as any)?.role || 'employee'
-  const isAdmin = userRole === 'admin'
   const myTasks = tasks.filter(t => t.emp === userName && t.st === 'В работе')
   const myDone = tasks.filter(t => t.emp === userName && t.st === 'Выполнено')
 
