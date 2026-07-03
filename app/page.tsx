@@ -22,11 +22,11 @@ const QTRS = [
 ]
 const QORDER = ['1 квартал', '2 квартал', '3 квартал', '4 квартал', 'Годовой']
 const QLABELS: Record<string, string> = {
-  '1 квартал': '1 квартал (янв–март) · до 15 мая',
-  '2 квартал': '2 квартал (апр–июнь) · до 15 авг',
-  '3 квартал': '3 квартал (июль–сент) · до 15 ноя',
-  '4 квартал': '4 квартал (окт–дек) · до 15 фев',
-  'Годовой': 'Годовой (100/920) · до 31 марта',
+  '1 квартал': '1 квартал (янв–март 2026) · до 15 мая 2026',
+  '2 квартал': '2 квартал (апр–июнь 2026) · до 15 авг 2026',
+  '3 квартал': '3 квартал (июль–сент 2026) · до 15 ноя 2026',
+  '4 квартал': '4 квартал (окт–дек 2026) · до 15 фев 2027',
+  'Годовой': 'Годовой (100/920) · до 31 марта 2027',
 }
 const DEFAULT_USERS = ['Нурдаулет', 'Акмарал', 'Динара', 'Жания', 'Ұлбосын', 'Айзат']
 
@@ -438,7 +438,7 @@ export default function DashboardPage() {
   const taxAct = taxFreq ? actCos.filter(c => c.freq === taxFreq) : actCos
   const stTax = {
     count: taxAct.length,
-    mainPaid: taxAct.filter(c => taxDone[`${c.n}|main|${taxMonth}`]).length,
+    mainPaid: taxAct.filter(c => taxDone[`${c.n}|main|${taxMonth - 1}`]).length,
   }
   const reps = buildReports(companies)
   function applyRepFilters(list: RepEntry[]) {
@@ -711,7 +711,7 @@ export default function DashboardPage() {
 
         {/* Мини-анализ рисков */}
         {stTax.count - stTax.mainPaid > 0 && (() => {
-          const unpaid = taxAct.filter(c => !taxDone[`${c.n}|main|${taxMonth}`])
+          const unpaid = taxAct.filter(c => !taxDone[`${c.n}|main|${taxMonth - 1}`])
           return (
             <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: '#c2410c', marginBottom: 6 }}>
@@ -959,7 +959,7 @@ function TaxSection({ companies, taxDone, taxMonth, taxFreq, onToggle, taxCommen
   return (
     <div>
       <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10, padding: '6px 10px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
-        Период: <strong>за {MN[prevMonth]}</strong> — налоги уплатить до <strong>25 {MN[taxMonth]}</strong>
+        Период: <strong>за {MN[prevMonth]} 2026</strong> — налоги уплатить до <strong>25 {MN[taxMonth]} 2026</strong>
       </div>
       {grps.map(g => {
         if (taxFreq && taxFreq !== g.freq) return null
@@ -975,9 +975,9 @@ function TaxSection({ companies, taxDone, taxMonth, taxFreq, onToggle, taxCommen
               <span style={{ color: '#94a3b8', fontWeight: 400 }}>· до 25 {MN[taxMonth]}</span>
             </div>
             {rows.map(c => {
-              const key = `${c.n}|main|${taxMonth}`
+              const key = `${c.n}|main|${taxMonth - 1}`
               const done = taxDone[key]
-              const cmtKey = `${c.n}|cmt|${taxMonth}`
+              const cmtKey = `${c.n}|cmt|${taxMonth - 1}`
               const cmt = taxComments[cmtKey] || ''
               return (
                 <div key={c.n} className="trow" style={{ flexWrap: 'wrap' as const, gap: 4 }}>
