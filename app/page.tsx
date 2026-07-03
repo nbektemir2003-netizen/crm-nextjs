@@ -6,7 +6,12 @@ import { useEffect, useState, useCallback } from 'react'
 // ─── ТИПЫ ───────────────────────────────
 type Company = { id?: string; n: string; freq: string; reg: string; cat: string; b: string; risk: string; nds: boolean; status: string; skipReports: string[]; extraReports: string[] }
 type Task = { id?: string; co: string; desc: string; emp: string; prio: string; date: string; st: string }
-type TabId = 'co' | 'tasks' | 'tax' | 'rep'
+type TabId = 'co' | 'tasks' | 'tax' | 'rep' | 'admin'
+type AdminReportItem = { code: string; period: 'quarterly' | 'annual'; hasMonths: boolean; onlyEvenQ?: boolean }
+type AdminSettings = {
+  regimes: string[]; categories: string[]; groups: string[]; bases: string[]; statuses: string[]; risks: string[]
+  taxReports: Record<string, AdminReportItem[]>; statReports: Record<string, AdminReportItem[]>
+}
 type SyncCls = '' | 'syncing' | 'error'
 
 // ─── КОНСТАНТЫ ──────────────────────────
@@ -33,6 +38,53 @@ function getQLABELS(y: number): Record<string, string> {
 }
 const QORDER = ['1 квартал', '2 квартал', '3 квартал', '4 квартал', 'Годовой']
 const DEFAULT_USERS = ['Нурдаулет', 'Акмарал', 'Динара', 'Жания', 'Ұлбосын', 'Айзат']
+const DEFAULT_ADMIN: AdminSettings = {
+  regimes: ['ОУР (НДС)', 'ОУР', 'УПРОЩЕНКА', 'СНР', 'КХ'],
+  categories: ['КАФЕШКИ', 'ПЕРЕПРОДАЖА', 'ПРОИЗВОДСТВО', 'СТРОИТЕЛЬСТВО', 'ПРОЧИЕ УСЛУГИ', 'ИП-ЖОО', 'Школы JOO', 'РАЗОВОЕ', 'ПРОЧЕЕ'],
+  groups: ['Ежедневная', 'Раз в месяц', 'Квартальная', 'Разовая', 'На закрытие'],
+  bases: ['БАР', 'ЖОҚ'],
+  statuses: ['Активная', 'Приостановлена', 'На закрытие'],
+  risks: ['низкая', 'средняя', 'высокая'],
+  taxReports: {
+    'ОУР (НДС)': [
+      { code: '300.00 (НДС)', period: 'quarterly', hasMonths: true },
+      { code: '200.00 (ИПН/СН)', period: 'quarterly', hasMonths: true },
+      { code: '100.00 (год. КПН)', period: 'annual', hasMonths: false },
+    ],
+    'ОУР': [
+      { code: '200.00 (ИПН/СН)', period: 'quarterly', hasMonths: true },
+      { code: '100.00 (год. КПН)', period: 'annual', hasMonths: false },
+    ],
+    'УПРОЩЕНКА': [
+      { code: '200.00 (ИПН сотр.)', period: 'quarterly', hasMonths: true },
+      { code: '910.00 (упрощённая)', period: 'quarterly', hasMonths: false, onlyEvenQ: true },
+    ],
+    'СНР': [
+      { code: '200.00 (ИПН сотр.)', period: 'quarterly', hasMonths: true },
+      { code: '910.00 (упрощённая)', period: 'quarterly', hasMonths: false, onlyEvenQ: true },
+    ],
+    'КХ': [{ code: '920.00 (декл. КХ)', period: 'annual', hasMonths: false }],
+  },
+  statReports: {
+    'ОУР (НДС)': [
+      { code: '1-Услуги (стат.)', period: 'quarterly', hasMonths: false },
+      { code: '11-МП (год. стат.)', period: 'annual', hasMonths: false },
+    ],
+    'ОУР': [
+      { code: '1-Услуги (стат.)', period: 'quarterly', hasMonths: false },
+      { code: '11-МП (год. стат.)', period: 'annual', hasMonths: false },
+    ],
+    'УПРОЩЕНКА': [
+      { code: '2МП (стат.)', period: 'quarterly', hasMonths: false },
+      { code: '11-МП (год. стат.)', period: 'annual', hasMonths: false },
+    ],
+    'СНР': [
+      { code: '2МП (стат.)', period: 'quarterly', hasMonths: false },
+      { code: '11-МП (год. стат.)', period: 'annual', hasMonths: false },
+    ],
+    'КХ': [],
+  },
+}
 
 // ─── УТИЛИТЫ ────────────────────────────
 function dl(d: string) {
@@ -71,7 +123,7 @@ function getStatTypes(reg: string): string[] {
 
 type RepEntry = { co: string; reg: string; type: string; q: string; due: string; months: number[] | null }
 
-function buildReports(companies: Company[], year: number): { tax: RepEntry[]; stat: RepEntry[] } {
+function buildReports(companies: Company[], year: number, admin: AdminSettings): { tax: RepEntry[]; stat: RepEntry[] } {
   const QTRS = getQTRS(year)
   const ny = year + 1
   const tax: RepEntry[] = [], stat: RepEntry[] = []
@@ -80,48 +132,38 @@ function buildReports(companies: Company[], year: number): { tax: RepEntry[]; st
     const r = c.reg
     const skip = c.skipReports || []
     const extra = c.extraReports || []
-    for (const qt of QTRS) {
-      if (r === 'ОУР (НДС)') {
-        if (!skip.includes('300.00 (НДС)')) tax.push({ co: c.n, reg: r, type: '300.00 (НДС)', q: qt.q, due: qt.due300, months: QM[qt.q] })
-        if (!skip.includes('200.00 (ИПН/СН)')) tax.push({ co: c.n, reg: r, type: '200.00 (ИПН/СН)', q: qt.q, due: qt.due200, months: QM[qt.q] })
-      }
-      if (r === 'ОУР') {
-        if (!skip.includes('200.00 (ИПН/СН)')) tax.push({ co: c.n, reg: r, type: '200.00 (ИПН/СН)', q: qt.q, due: qt.due200, months: QM[qt.q] })
-      }
-      if (r === 'УПРОЩЕНКА' || r === 'СНР') {
-        if (!skip.includes('200.00 (ИПН сотр.)')) tax.push({ co: c.n, reg: r, type: '200.00 (ИПН сотр.)', q: qt.q, due: qt.due200, months: QM[qt.q] })
-        if (qt.has910 && !skip.includes('910.00 (упрощённая)')) tax.push({ co: c.n, reg: r, type: '910.00 (упрощённая)', q: qt.q, due: qt.due910, months: null })
-      }
-      if (r !== 'КХ') {
-        const isOUR = r === 'ОУР (НДС)' || r === 'ОУР'
-        const statType = isOUR ? '1-Услуги (стат.)' : '2МП (стат.)'
-        if (!skip.includes(statType)) stat.push({ co: c.n, reg: r, type: statType, q: qt.q, due: qt.due200, months: null })
+    for (const rep of (admin.taxReports[r] || [])) {
+      if (skip.includes(rep.code)) continue
+      if (rep.period === 'annual') {
+        tax.push({ co: c.n, reg: r, type: rep.code, q: 'Годовой', due: `${ny}-03-31`, months: null })
+      } else {
+        for (const qt of QTRS) {
+          if (rep.onlyEvenQ && !qt.has910) continue
+          tax.push({ co: c.n, reg: r, type: rep.code, q: qt.q, due: qt.due200, months: rep.hasMonths ? QM[qt.q] : null })
+        }
       }
     }
-    if ((r === 'ОУР (НДС)' || r === 'ОУР') && !skip.includes('100.00 (КПН годовой)'))
-      tax.push({ co: c.n, reg: r, type: '100.00 (год. КПН)', q: 'Годовой', due: `${ny}-03-31`, months: null })
-    if (r === 'КХ' && !skip.includes('920.00 (декл. КХ)'))
-      tax.push({ co: c.n, reg: r, type: '920.00 (декл. КХ)', q: 'Годовой', due: `${ny}-03-31`, months: null })
-    if (r !== 'КХ' && !skip.includes('11-МП (год. стат.)'))
-      stat.push({ co: c.n, reg: r, type: '11-МП (год. стат.)', q: 'Годовой', due: `${ny}-02-15`, months: null })
+    for (const rep of (admin.statReports[r] || [])) {
+      if (skip.includes(rep.code)) continue
+      if (rep.period === 'annual') {
+        stat.push({ co: c.n, reg: r, type: rep.code, q: 'Годовой', due: `${ny}-02-15`, months: null })
+      } else {
+        for (const qt of QTRS) {
+          stat.push({ co: c.n, reg: r, type: rep.code, q: qt.q, due: qt.due200, months: null })
+        }
+      }
+    }
     extra.forEach(e => {
       if (skip.includes(e)) return
       const parts = e.split('|')
       const name = parts[0], period = parts[1] || 'annual', repType = parts[2] || 'tax'
       const isStat = repType === 'stat'
       if (period === 'quarterly') {
-        for (const qt of QTRS) {
-          if (isStat) stat.push({ co: c.n, reg: r, type: name, q: qt.q, due: qt.due200, months: null })
-          else tax.push({ co: c.n, reg: r, type: name, q: qt.q, due: qt.due200, months: null })
-        }
+        for (const qt of QTRS) { (isStat ? stat : tax).push({ co: c.n, reg: r, type: name, q: qt.q, due: qt.due200, months: null }) }
       } else if (period === 'monthly') {
-        for (const qt of QTRS) {
-          if (isStat) stat.push({ co: c.n, reg: r, type: name + ' (ежемес.)', q: qt.q, due: qt.due200, months: QM[qt.q] })
-          else tax.push({ co: c.n, reg: r, type: name + ' (ежемес.)', q: qt.q, due: qt.due200, months: QM[qt.q] })
-        }
+        for (const qt of QTRS) { (isStat ? stat : tax).push({ co: c.n, reg: r, type: name + ' (ежемес.)', q: qt.q, due: qt.due200, months: QM[qt.q] }) }
       } else {
-        if (isStat) stat.push({ co: c.n, reg: r, type: name, q: 'Годовой', due: `${ny}-03-31`, months: null })
-        else tax.push({ co: c.n, reg: r, type: name, q: 'Годовой', due: `${ny}-03-31`, months: null })
+        (isStat ? stat : tax).push({ co: c.n, reg: r, type: name, q: 'Годовой', due: `${ny}-03-31`, months: null })
       }
     })
   }
@@ -171,6 +213,10 @@ export default function DashboardPage() {
   const [repReg, setRepReg] = useState('')
   const [repStatus, setRepStatus] = useState('')
   const [repSubTab, setRepSubTab] = useState<'tax' | 'stat'>('tax')
+
+  // Администрирование
+  const [adminSettings, setAdminSettings] = useState<AdminSettings>(DEFAULT_ADMIN)
+  const [adminSubTab, setAdminSubTab] = useState<'refs' | 'tax' | 'stat'>('refs')
 
   // Форма новой задачи
   const [newTaskCo, setNewTaskCo] = useState('')
@@ -227,6 +273,8 @@ export default function DashboardPage() {
     if (cp) try { setCoPhones(JSON.parse(cp)) } catch {}
     const ct = localStorage.getItem('crm_coTaxContacts')
     if (ct) try { setCoTaxContacts(JSON.parse(ct)) } catch {}
+    const as = localStorage.getItem('crm_adminSettings')
+    if (as) try { setAdminSettings(JSON.parse(as)) } catch {}
   }, [])
 
   async function loadData() {
@@ -266,6 +314,9 @@ export default function DashboardPage() {
   function saveCoTaxContact(id: string, val: string) {
     const n = { ...coTaxContacts, [id]: val }
     setCoTaxContacts(n); localStorage.setItem('crm_coTaxContacts', JSON.stringify(n))
+  }
+  function saveAdminSettings(s: AdminSettings) {
+    setAdminSettings(s); localStorage.setItem('crm_adminSettings', JSON.stringify(s))
   }
 
   // ─── КОМПАНИИ ───────────────────────────
@@ -414,6 +465,12 @@ export default function DashboardPage() {
     saveTaxDone(nd)
     showToast(`Отмечено ${taxAct.length} компаний ✓`)
   }
+  function resetAllTaxPaid() {
+    const nd = { ...taxDone }
+    taxAct.forEach(c => { nd[taxKey(c.n, taxMonth - 1)] = false })
+    saveTaxDone(nd)
+    showToast(`Сброшено ${taxAct.length} компаний`)
+  }
   function exportTaxCSV() {
     const monthName = MN[taxMonth - 1]
     const rows = ['﻿Компания\tРежим\tГруппа\tСтатус\tКатегория']
@@ -487,7 +544,7 @@ export default function DashboardPage() {
     count: taxAct.length,
     mainPaid: taxAct.filter(c => taxDone[taxKey(c.n, taxMonth - 1)]).length,
   }
-  const reps = buildReports(companies, repYear)
+  const reps = buildReports(companies, repYear, adminSettings)
   const QLABELS = getQLABELS(repYear)
   const repKey = (r: RepEntry) => `${r.co}|${r.type}|${r.q}|${repYear}`
   function applyRepFilters(list: RepEntry[]) {
@@ -531,6 +588,11 @@ export default function DashboardPage() {
               <i className={`ti ${icon}`}></i>{label}
             </button>
           ))}
+          {isAdmin && (
+            <button className={`crm-tab${tab === 'admin' ? ' active' : ''}`} onClick={() => setTab('admin')}>
+              <i className="ti ti-settings"></i>Администрирование
+            </button>
+          )}
         </nav>
 
         <div className="crm-sidebar-bottom">
@@ -549,7 +611,7 @@ export default function DashboardPage() {
         {/* Топбар */}
         <div className="crm-topbar">
           <span className="crm-topbar-title">
-            {tab === 'co' ? 'Компании' : tab === 'tasks' ? 'Задачи' : tab === 'tax' ? 'Налоги' : 'Отчётность'}
+            {tab === 'co' ? 'Компании' : tab === 'tasks' ? 'Задачи' : tab === 'tax' ? 'Налоги' : tab === 'rep' ? 'Отчётность' : 'Администрирование'}
           </span>
           <div className="crm-topbar-actions">
             <span className={`sync-status ${syncCls}`}>{syncText}</span>
@@ -816,6 +878,7 @@ export default function DashboardPage() {
         <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
           <span style={{ fontSize: 11, color: '#6b7280' }}>Показано: {taxAct.length} компаний</span>
           <button className="btn-sm" onClick={markAllTaxPaid} style={{ marginLeft: 'auto' }}>✓ Отметить всех уплачено</button>
+          <button className="btn-sm" onClick={resetAllTaxPaid} style={{ background: '#fff', color: '#dc2626', border: '1px solid #fecaca' }}>✕ Сбросить</button>
           <button className="btn-sm" onClick={exportTaxCSV} style={{ background: '#fff', color: '#6366f1', border: '1px solid #c7d2fe' }}>⬇ Скачать отчёт</button>
         </div>
         <TaxSection companies={taxAct} taxDone={taxDone} taxMonth={taxMonth} taxYear={taxYear} taxFreq={taxFreq} onToggle={toggleTax} taxComments={taxComments} onComment={saveTaxComment} />
@@ -870,6 +933,13 @@ export default function DashboardPage() {
         />
       </div>
 
+
+      {/* ═══════════════ АДМИНИСТРИРОВАНИЕ ═══════════════ */}
+      {isAdmin && (
+        <div className={`crm-sec${tab === 'admin' ? ' active' : ''}`}>
+          <AdminSection adminSettings={adminSettings} onSave={saveAdminSettings} />
+        </div>
+      )}
 
       {/* ═══════════════ МОДАЛ УВЕДОМЛЕНИЙ ═══════════════ */}
       {showNotif && (
@@ -969,7 +1039,7 @@ export default function DashboardPage() {
                 <input type="text" placeholder="Телефон / имя инспектора" value={coTaxContacts[editCoData.id || ''] || ''} onChange={e => saveCoTaxContact(editCoData.id || '', e.target.value)} />
               </div>
             </div>
-            <EditCoReports company={editCoData} onChange={setEditCoData} />
+            <EditCoReports company={editCoData} onChange={setEditCoData} adminSettings={adminSettings} />
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <button className="btn" onClick={saveCoEdit}>Сохранить</button>
               <button className="btn-warn" onClick={deleteCoFromModal}>Удалить</button>
@@ -1200,30 +1270,15 @@ function ReportsSection({ reports, repDone, taxDone, repYear, repQ, repReg, repS
 }
 
 // ─── КОМПОНЕНТ: РЕДАКТИРОВАНИЕ ОТЧЁТОВ КОМПАНИИ ──────────────
-function EditCoReports({ company, onChange }: { company: Company; onChange: (fn: (p: Company | null) => Company | null) => void }) {
+function EditCoReports({ company, onChange, adminSettings }: { company: Company; onChange: (fn: (p: Company | null) => Company | null) => void; adminSettings: AdminSettings }) {
   const [newRepName, setNewRepName] = useState('')
   const [newRepPeriod, setNewRepPeriod] = useState('quarterly')
   const [newRepType, setNewRepType] = useState('tax')
 
-  const taxReports: Record<string, string[]> = {
-    'ОУР (НДС)': ['300.00 (НДС)', '200.00 (ИПН/СН)', '100.00 (КПН годовой)'],
-    'ОУР': ['200.00 (ИПН/СН)', '100.00 (КПН годовой)'],
-    'УПРОЩЕНКА': ['910.00 (упрощённая)', '200.00 (ИПН сотр.)'],
-    'СНР': ['910.00 (упрощённая)', '200.00 (ИПН сотр.)'],
-    'КХ': ['920.00 (декл. КХ)'],
-  }
-  const statReports: Record<string, string[]> = {
-    'ОУР (НДС)': ['1-Услуги (стат.)', '11-МП (год. стат.)'],
-    'ОУР': ['1-Услуги (стат.)', '11-МП (год. стат.)'],
-    'УПРОЩЕНКА': ['2МП (стат.)', '11-МП (год. стат.)'],
-    'СНР': ['2МП (стат.)', '11-МП (год. стат.)'],
-    'КХ': [],
-  }
-
   const skip = company.skipReports || []
   const extra = company.extraReports || []
-  const taxList = taxReports[company.reg] || []
-  const statList = statReports[company.reg] || []
+  const taxList = (adminSettings.taxReports[company.reg] || []).map(r => r.code)
+  const statList = (adminSettings.statReports[company.reg] || []).map(r => r.code)
 
   function toggleSkip(rep: string, shouldSkip: boolean) {
     onChange(p => {
@@ -1325,6 +1380,178 @@ function EditCoReports({ company, onChange }: { company: Company; onChange: (fn:
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─── КОМПОНЕНТ: АДМИНИСТРИРОВАНИЕ ──────────────
+function AdminSection({ adminSettings, onSave }: { adminSettings: AdminSettings; onSave: (s: AdminSettings) => void }) {
+  const [sub, setSub] = useState<'refs' | 'tax' | 'stat'>('refs')
+  const [newItems, setNewItems] = useState<Record<string, string>>({})
+  const [newRep, setNewRep] = useState<Record<string, { code: string; period: string; hasMonths: boolean; onlyEvenQ: boolean }>>({})
+
+  type RefKey = 'regimes' | 'categories' | 'groups' | 'bases' | 'statuses' | 'risks'
+  const refs: { key: RefKey; label: string; icon: string }[] = [
+    { key: 'regimes', label: 'Налоговые режимы', icon: '🏛' },
+    { key: 'groups', label: 'Группы обслуживания', icon: '📦' },
+    { key: 'categories', label: 'Категории', icon: '🏷' },
+    { key: 'bases', label: '1С База', icon: '💾' },
+    { key: 'statuses', label: 'Статусы компании', icon: '🔘' },
+    { key: 'risks', label: 'Уровни риска', icon: '⚠️' },
+  ]
+
+  function addItem(key: RefKey) {
+    const val = (newItems[key] || '').trim()
+    if (!val || adminSettings[key].includes(val)) return
+    onSave({ ...adminSettings, [key]: [...adminSettings[key], val] })
+    setNewItems(p => ({ ...p, [key]: '' }))
+  }
+  function deleteItem(key: RefKey, item: string) {
+    if (!confirm(`Удалить "${item}"?`)) return
+    onSave({ ...adminSettings, [key]: adminSettings[key].filter(x => x !== item) })
+  }
+  function renameItem(key: RefKey, oldVal: string, newVal: string) {
+    if (!newVal.trim() || newVal === oldVal) return
+    onSave({ ...adminSettings, [key]: adminSettings[key].map(x => x === oldVal ? newVal.trim() : x) })
+  }
+
+  const isStatTab = sub === 'stat'
+  const repField = isStatTab ? adminSettings.statReports : adminSettings.taxReports
+
+  function getInp(regime: string) {
+    return newRep[regime] || { code: '', period: 'quarterly', hasMonths: false, onlyEvenQ: false }
+  }
+  function setInp(regime: string, val: Partial<{ code: string; period: string; hasMonths: boolean; onlyEvenQ: boolean }>) {
+    setNewRep(p => ({ ...p, [regime]: { ...getInp(regime), ...val } }))
+  }
+  function addReport(regime: string) {
+    const inp = getInp(regime)
+    if (!inp.code.trim()) return
+    const item: AdminReportItem = { code: inp.code.trim(), period: inp.period as 'quarterly' | 'annual', hasMonths: inp.hasMonths, onlyEvenQ: inp.onlyEvenQ }
+    const existing = repField[regime] || []
+    if (existing.some(r => r.code === item.code)) return
+    const field = isStatTab ? 'statReports' : 'taxReports'
+    onSave({ ...adminSettings, [field]: { ...repField, [regime]: [...existing, item] } })
+    setNewRep(p => ({ ...p, [regime]: { code: '', period: 'quarterly', hasMonths: false, onlyEvenQ: false } }))
+  }
+  function deleteReport(regime: string, code: string) {
+    const field = isStatTab ? 'statReports' : 'taxReports'
+    onSave({ ...adminSettings, [field]: { ...repField, [regime]: (repField[regime] || []).filter(r => r.code !== code) } })
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' as const }}>
+        <div className="stabs" style={{ marginBottom: 0 }}>
+          <button className={`stab${sub === 'refs' ? ' active' : ''}`} onClick={() => setSub('refs')}>📚 Справочники</button>
+          <button className={`stab${sub === 'tax' ? ' active' : ''}`} onClick={() => setSub('tax')}>📋 Нал. отчёты</button>
+          <button className={`stab${sub === 'stat' ? ' active' : ''}`} onClick={() => setSub('stat')}>📊 Стат. отчёты</button>
+        </div>
+        <span style={{ fontSize: 11, color: '#94a3b8' }}>Настройки применяются ко вкладкам Налоги и Отчётность</span>
+      </div>
+
+      {sub === 'refs' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 14 }}>
+          {refs.map(({ key, label, icon }) => (
+            <div key={key} style={{ background: '#fff', borderRadius: 14, padding: '16px', boxShadow: '0 2px 8px rgba(99,102,241,.08)' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 12, paddingBottom: 8, borderBottom: '1px solid #f3f4f6' }}>{icon} {label}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10, maxHeight: 220, overflowY: 'auto' }}>
+                {adminSettings[key].map(item => (
+                  <RefItem key={item} value={item} onDelete={() => deleteItem(key, item)} onRename={nv => renameItem(key, item, nv)} />
+                ))}
+                {adminSettings[key].length === 0 && <div style={{ fontSize: 11, color: '#d1d5db', padding: '4px 0' }}>Пусто</div>}
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input type="text" placeholder="Новое значение..." value={newItems[key] || ''}
+                  onChange={e => setNewItems(p => ({ ...p, [key]: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && addItem(key)}
+                  style={{ flex: 1, fontSize: 12, padding: '6px 9px', border: '1px solid #e5e7eb', borderRadius: 7, outline: 'none' }}
+                />
+                <button onClick={() => addItem(key)} className="btn-sm">+ Добавить</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(sub === 'tax' || sub === 'stat') && (
+        <div>
+          <div style={{ fontSize: 11, color: '#4f46e5', marginBottom: 12, padding: '7px 12px', background: '#f5f3ff', borderRadius: 7, border: '1px solid #e0d9fb' }}>
+            {isStatTab ? '📊 Статистические отчёты — какие формы сдаёт каждый режим (квартально/годовой)' : '📋 Налоговые декларации — настройте формы по режимам. Месяца = ежемесячный налог, Q2+Q4 = только 2-й и 4-й квартал'}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: 14 }}>
+            {adminSettings.regimes.map(regime => {
+              const reps = repField[regime] || []
+              const inp = getInp(regime)
+              return (
+                <div key={regime} style={{ background: '#fff', borderRadius: 14, padding: '16px', boxShadow: '0 2px 8px rgba(99,102,241,.08)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid #f3f4f6' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#4f46e5' }}>{regime}</span>
+                    <span style={{ fontSize: 10, background: '#f3f4f6', color: '#6b7280', borderRadius: 99, padding: '2px 7px', marginLeft: 'auto' }}>{reps.length} отчётов</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 10, minHeight: 28 }}>
+                    {reps.length === 0 && <div style={{ fontSize: 11, color: '#d1d5db' }}>Отчётов не настроено</div>}
+                    {reps.map(rep => (
+                      <div key={rep.code} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', background: '#f9fafb', borderRadius: 7, fontSize: 11 }}>
+                        <span style={{ flex: 1, color: '#111827', fontWeight: 500 }}>{rep.code}</span>
+                        <span style={{ color: '#94a3b8', fontSize: 10, whiteSpace: 'nowrap' as const }}>{rep.period === 'annual' ? 'год.' : rep.onlyEvenQ ? 'Q2+Q4' : 'кварт.'}</span>
+                        {rep.hasMonths && <span style={{ fontSize: 9, background: '#ede9fe', color: '#6d28d9', borderRadius: 4, padding: '1px 5px' }}>мес.</span>}
+                        <button onClick={() => deleteReport(regime, rep.code)} style={{ background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px' }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: 10 }}>
+                    <input type="text" placeholder="Код отчёта, напр. 300.00 (НДС)..." value={inp.code}
+                      onChange={e => setInp(regime, { code: e.target.value })}
+                      onKeyDown={e => e.key === 'Enter' && addReport(regime)}
+                      style={{ width: '100%', fontSize: 11, padding: '5px 8px', border: '1px solid #e5e7eb', borderRadius: 6, marginBottom: 6, outline: 'none', boxSizing: 'border-box' as const }}
+                    />
+                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' as const, alignItems: 'center' }}>
+                      <select value={inp.period} onChange={e => setInp(regime, { period: e.target.value })} style={{ fontSize: 11, padding: '4px 7px', border: '1px solid #e5e7eb', borderRadius: 5 }}>
+                        <option value="quarterly">Квартально</option>
+                        <option value="annual">Годовой</option>
+                      </select>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10.5, color: '#6b7280', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={inp.hasMonths} onChange={e => setInp(regime, { hasMonths: e.target.checked })} style={{ accentColor: '#6366f1' }} />
+                        Месяца
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10.5, color: '#6b7280', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={inp.onlyEvenQ} onChange={e => setInp(regime, { onlyEvenQ: e.target.checked })} style={{ accentColor: '#6366f1' }} />
+                        Q2+Q4
+                      </label>
+                      <button onClick={() => addReport(regime)} className="btn-sm" style={{ marginLeft: 'auto' }}>+ Добавить</button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RefItem({ value, onDelete, onRename }: { value: string; onDelete: () => void; onRename: (v: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  if (editing) {
+    return (
+      <div style={{ display: 'flex', gap: 4 }}>
+        <input autoFocus value={draft} onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { onRename(draft); setEditing(false) } if (e.key === 'Escape') setEditing(false) }}
+          style={{ flex: 1, fontSize: 12, padding: '4px 7px', border: '1.5px solid #6366f1', borderRadius: 5, outline: 'none' }}
+        />
+        <button onClick={() => { onRename(draft); setEditing(false) }} style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 5, fontSize: 11, padding: '3px 8px', cursor: 'pointer' }}>✓</button>
+        <button onClick={() => { setDraft(value); setEditing(false) }} style={{ background: '#f3f4f6', border: 'none', borderRadius: 5, fontSize: 11, padding: '3px 6px', cursor: 'pointer' }}>✕</button>
+      </div>
+    )
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', padding: '5px 8px', background: '#f9fafb', borderRadius: 7, fontSize: 12, gap: 6 }}>
+      <span style={{ flex: 1, color: '#374151' }}>{value}</span>
+      <button onClick={() => { setDraft(value); setEditing(true) }} style={{ background: 'none', border: 'none', color: '#a5b4fc', cursor: 'pointer', fontSize: 12, padding: '0 2px' }} title="Переименовать">✏️</button>
+      <button onClick={onDelete} style={{ background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px' }}>✕</button>
     </div>
   )
 }
