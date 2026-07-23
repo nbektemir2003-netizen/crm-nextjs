@@ -2,6 +2,7 @@
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useCallback } from 'react'
+import * as XLSX from 'xlsx'
 
 // ─── ТИПЫ ───────────────────────────────
 type Company = { id?: string; n: string; freq: string; reg: string; cat: string; b: string; risk: string; nds: boolean; status: string; skipReports: string[]; extraReports: string[] }
@@ -486,27 +487,35 @@ export default function DashboardPage() {
   }
   function exportTaxCSV() {
     const monthName = MN[taxMonth - 1]
-    const rows = ['﻿Компания\tРежим\tГруппа\tСтатус\tКатегория']
-    taxAct.forEach(c => {
-      const paid = taxDone[taxKey(c.n, taxMonth - 1)] ? 'Уплачен' : 'Не уплачен'
-      rows.push(`${c.n}\t${c.reg}\t${c.freq}\t${paid}\t${c.cat}`)
-    })
-    const blob = new Blob([rows.join('\n')], { type: 'text/tab-separated-values;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = `налоги_${monthName}_${taxYear}.tsv`; a.click()
-    URL.revokeObjectURL(url)
+    const data = taxAct.map(c => ({
+      'Компания': c.n,
+      'Режим': c.reg,
+      'Группа': c.freq,
+      'Категория': c.cat,
+      'Статус налога': taxDone[taxKey(c.n, taxMonth - 1)] ? 'Уплачен' : 'Не уплачен',
+    }))
+    const ws = XLSX.utils.json_to_sheet(data)
+    ws['!cols'] = [{ wch: 40 }, { wch: 16 }, { wch: 18 }, { wch: 20 }, { wch: 16 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Налоги')
+    XLSX.writeFile(wb, `налоги_${monthName}_${taxYear}.xlsx`)
   }
   function exportRepCSV() {
     const list = repSubTab === 'tax' ? taxReps : statReps
-    const rows = ['﻿Компания\tРежим\tОтчёт\tКвартал\tСрок\tСтатус']
-    list.forEach(r => {
-      const st = repDone[`${r.co}|${r.type}|${r.q}|${repYear}`] ? 'Сдан' : 'Не сдан'
-      rows.push(`${r.co}\t${r.reg}\t${r.type}\t${r.q}\t${r.due}\t${st}`)
-    })
-    const blob = new Blob([rows.join('\n')], { type: 'text/tab-separated-values;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = `отчётность_${repYear}.tsv`; a.click()
-    URL.revokeObjectURL(url)
+    const label = repSubTab === 'tax' ? 'Нал. отчёты' : 'Стат. отчёты'
+    const data = list.map(r => ({
+      'Компания': r.co,
+      'Режим': r.reg,
+      'Отчёт': r.type,
+      'Период': r.q,
+      'Срок': r.due,
+      'Статус': repDone[`${r.co}|${r.type}|${r.q}|${repYear}`] ? 'Сдан' : 'Не сдан',
+    }))
+    const ws = XLSX.utils.json_to_sheet(data)
+    ws['!cols'] = [{ wch: 40 }, { wch: 16 }, { wch: 24 }, { wch: 18 }, { wch: 14 }, { wch: 12 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, label)
+    XLSX.writeFile(wb, `отчётность_${label}_${repYear}.xlsx`)
   }
 
   // ─── ПОЛЬЗОВАТЕЛИ ───────────────────────
@@ -892,7 +901,7 @@ export default function DashboardPage() {
           <span style={{ fontSize: 11, color: '#6b7280' }}>Показано: {taxAct.length} компаний</span>
           <button className="btn-sm" onClick={markAllTaxPaid} style={{ marginLeft: 'auto' }}>✓ Отметить всех уплачено</button>
           <button className="btn-sm" onClick={resetAllTaxPaid} style={{ background: '#fff', color: '#dc2626', border: '1px solid #fecaca' }}>✕ Сбросить</button>
-          <button className="btn-sm" onClick={exportTaxCSV} style={{ background: '#fff', color: '#6366f1', border: '1px solid #c7d2fe' }}>⬇ Скачать отчёт</button>
+          <button className="btn-sm" onClick={exportTaxCSV} style={{ background: '#fff', color: '#6366f1', border: '1px solid #c7d2fe' }}>⬇ Excel</button>
         </div>
         <TaxSection companies={taxAct} taxDone={taxDone} taxMonth={taxMonth} taxYear={taxYear} taxFreq={taxFreq} onToggle={toggleTax} taxComments={taxComments} onComment={saveTaxComment} />
       </div>
@@ -917,7 +926,7 @@ export default function DashboardPage() {
             <option value={2026}>2026 год</option>
             <option value={2027}>2027 год</option>
           </select>
-          <button className="btn-sm" onClick={exportRepCSV} style={{ marginLeft: 'auto', background: '#fff', color: '#6366f1', border: '1px solid #c7d2fe' }}>⬇ Скачать отчёт</button>
+          <button className="btn-sm" onClick={exportRepCSV} style={{ marginLeft: 'auto', background: '#fff', color: '#6366f1', border: '1px solid #c7d2fe' }}>⬇ Excel</button>
         </div>
         <div className="ff" style={{ marginBottom: 9 }}>
           <select value={repQ} onChange={e => setRepQ(e.target.value)}>
