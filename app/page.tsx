@@ -267,10 +267,6 @@ export default function DashboardPage() {
     document.body.classList.remove('dark')
     const savedUsers = localStorage.getItem('crm_users')
     if (savedUsers) try { setUsers(JSON.parse(savedUsers)) } catch {}
-    const td = localStorage.getItem('crm_taxDone')
-    if (td) try { setTaxDone(JSON.parse(td)) } catch {}
-    const rd = localStorage.getItem('crm_repDone')
-    if (rd) try { setRepDone(JSON.parse(rd)) } catch {}
     const tc = localStorage.getItem('crm_taxComments')
     if (tc) try { setTaxComments(JSON.parse(tc)) } catch {}
     const cp = localStorage.getItem('crm_coPhones')
@@ -284,9 +280,14 @@ export default function DashboardPage() {
   async function loadData() {
     setSyncText('Загрузка...'); setSyncCls('syncing')
     try {
-      const [coRes, taskRes] = await Promise.all([fetch('/api/companies'), fetch('/api/tasks')])
+      const [coRes, taskRes, tdRes, rdRes] = await Promise.all([
+        fetch('/api/companies'), fetch('/api/tasks'),
+        fetch('/api/taxdone'), fetch('/api/repdone'),
+      ])
       if (coRes.ok) { const d = await coRes.json(); if (Array.isArray(d)) setCompanies(d) }
       if (taskRes.ok) { const d = await taskRes.json(); if (Array.isArray(d)) setTasks(d) }
+      if (tdRes.ok) { const d = await tdRes.json(); if (d && !d.error) setTaxDone(d) }
+      if (rdRes.ok) { const d = await rdRes.json(); if (d && !d.error) setRepDone(d) }
       setSyncText('Синхронизировано ✓'); setSyncCls('')
     } catch {
       setSyncText('Офлайн режим'); setSyncCls('error')
@@ -298,13 +299,19 @@ export default function DashboardPage() {
     setTimeout(() => setToastVisible(false), 2500)
   }
 
-  function saveTaxDone(td: Record<string, boolean>) {
-    setTaxDone(td)
-    localStorage.setItem('crm_taxDone', JSON.stringify(td))
+  function saveTaxDone(nd: Record<string, boolean>, changedKeys?: string[]) {
+    setTaxDone(nd)
+    const rows = changedKeys
+      ? changedKeys.map(k => ({ key: k, done: nd[k] || false }))
+      : Object.entries(nd).map(([key, done]) => ({ key, done }))
+    fetch('/api/taxdone', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rows) })
   }
-  function saveRepDone(rd: Record<string, boolean>) {
-    setRepDone(rd)
-    localStorage.setItem('crm_repDone', JSON.stringify(rd))
+  function saveRepDone(nd: Record<string, boolean>, changedKeys?: string[]) {
+    setRepDone(nd)
+    const rows = changedKeys
+      ? changedKeys.map(k => ({ key: k, done: nd[k] || false }))
+      : Object.entries(nd).map(([key, done]) => ({ key, done }))
+    fetch('/api/repdone', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rows) })
   }
 
   function saveTaxComment(key: string, val: string) {
@@ -450,29 +457,31 @@ export default function DashboardPage() {
   // ─── НАЛОГИ ─────────────────────────────
   function toggleTax(key: string) {
     const nd = { ...taxDone, [key]: !taxDone[key] }
-    saveTaxDone(nd)
+    saveTaxDone(nd, [key])
   }
 
   // ─── ОТЧЁТЫ ─────────────────────────────
   function toggleRep(key: string) {
     const nd = { ...repDone, [key]: !repDone[key] }
-    saveRepDone(nd)
+    saveRepDone(nd, [key])
     showToast(nd[key] ? 'Отчёт сдан ✓' : 'Отмечено как не сданный')
   }
   function toggleMonthTax(key: string) {
     const nd = { ...taxDone, [key]: !taxDone[key] }
-    saveTaxDone(nd)
+    saveTaxDone(nd, [key])
   }
   function markAllTaxPaid() {
     const nd = { ...taxDone }
-    taxAct.forEach(c => { nd[taxKey(c.n, taxMonth - 1)] = true })
-    saveTaxDone(nd)
+    const keys: string[] = []
+    taxAct.forEach(c => { const k = taxKey(c.n, taxMonth - 1); nd[k] = true; keys.push(k) })
+    saveTaxDone(nd, keys)
     showToast(`Отмечено ${taxAct.length} компаний ✓`)
   }
   function resetAllTaxPaid() {
     const nd = { ...taxDone }
-    taxAct.forEach(c => { nd[taxKey(c.n, taxMonth - 1)] = false })
-    saveTaxDone(nd)
+    const keys: string[] = []
+    taxAct.forEach(c => { const k = taxKey(c.n, taxMonth - 1); nd[k] = false; keys.push(k) })
+    saveTaxDone(nd, keys)
     showToast(`Сброшено ${taxAct.length} компаний`)
   }
   function exportTaxCSV() {
