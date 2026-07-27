@@ -1610,27 +1610,35 @@ function PaySection({ companies, payEntries, payYear, paySubTab, onYearChange, o
   onSubTabChange: (t: 'kpn' | 'nds') => void
   onSave: (key: string, patch: Partial<PayEntry>) => void
 }) {
+  const [selQ, setSelQ] = useState('1 квартал')
   const active = companies.filter(c => c.status === 'Активная')
   const list = paySubTab === 'nds' ? active.filter(c => c.nds || c.reg === 'ОУР (НДС)') : active
   const periods = getPayPeriods(paySubTab, payYear)
-
-  const totals = periods.map(p => {
-    let sum = 0, paidSum = 0, paidCount = 0
-    list.forEach(c => {
-      const key = `${c.n}|${paySubTab}|${p.q}|${payYear}`
-      const e = payEntries[key]
-      const amt = e ? parseFloat(e.amount.replace(/\s/g, '').replace(',', '.')) || 0 : 0
-      sum += amt
-      if (e?.paid) { paidSum += amt; paidCount++ }
-    })
-    return { sum, paidSum, unpaidSum: sum - paidSum, paidCount }
-  })
+  const p = periods.find(x => x.q === selQ) || periods[0]
 
   const fmt = (n: number) => n > 0 ? n.toLocaleString('ru-RU') : '—'
 
+  // Статистика по выбранному кварталу
+  let totalSum = 0, paidSum = 0, paidCount = 0, unpaidCount = 0
+  list.forEach(c => {
+    const key = `${c.n}|${paySubTab}|${p.q}|${payYear}`
+    const e = payEntries[key]
+    const amt = e ? parseFloat(e.amount.replace(/\s/g, '').replace(',', '.')) || 0 : 0
+    totalSum += amt
+    if (e?.paid) { paidSum += amt; paidCount++ } else { unpaidCount++ }
+  })
+  const unpaidSum = totalSum - paidSum
+
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const dueDate = new Date(p.due); dueDate.setHours(0, 0, 0, 0)
+  const daysLeft = Math.round((dueDate.getTime() - today.getTime()) / 86400000)
+  const isOverdue = daysLeft < 0
+  const isSoon = daysLeft >= 0 && daysLeft <= 7
+
   return (
     <div>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' as const }}>
+      {/* ── Фильтры ── */}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' as const }}>
         <div className="stabs" style={{ marginBottom: 0 }}>
           <button className={`stab${paySubTab === 'kpn' ? ' active' : ''}`} onClick={() => onSubTabChange('kpn')}>КПН и ИПН</button>
           <button className={`stab${paySubTab === 'nds' ? ' active' : ''}`} onClick={() => onSubTabChange('nds')}>НДС</button>
@@ -1640,105 +1648,108 @@ function PaySection({ companies, payEntries, payYear, paySubTab, onYearChange, o
           <option value={2026}>2026 год</option>
           <option value={2027}>2027 год</option>
         </select>
-        <span style={{ fontSize: 12, color: '#6b7280' }}>Компаний: {list.length}</span>
+        <select value={selQ} onChange={e => setSelQ(e.target.value)} style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#111827' }}>
+          {periods.map(x => <option key={x.q} value={x.q}>{x.q} · до {x.dueLabel}</option>)}
+        </select>
       </div>
 
-      <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fill, minmax(480px, 1fr))' }}>
-        {periods.map((p, pi) => {
-          const today = new Date(); today.setHours(0, 0, 0, 0)
-          const dueDate = new Date(p.due); dueDate.setHours(0, 0, 0, 0)
-          const daysLeft = Math.round((dueDate.getTime() - today.getTime()) / 86400000)
-          const isOverdue = daysLeft < 0
-          const isSoon = daysLeft >= 0 && daysLeft <= 7
-          const t = totals[pi]
+      {/* ── Мини-аналитика ── */}
+      <div className="srow" style={{ marginBottom: 16 }}>
+        <div className="stat s-indigo">
+          <div className="sl">Компаний</div>
+          <div className="sv">{list.length}</div>
+        </div>
+        <div className="stat s-green">
+          <div className="sl">Уплачено</div>
+          <div className="sv green">{paidCount}</div>
+        </div>
+        <div className="stat s-red">
+          <div className="sl">Не уплачено</div>
+          <div className="sv red">{unpaidCount}</div>
+        </div>
+        <div className="stat" style={{ borderLeft: '3px solid #6366f1' }}>
+          <div className="sl">Сумма всего</div>
+          <div className="sv" style={{ fontSize: 15 }}>{fmt(totalSum)} ₸</div>
+        </div>
+        <div className="stat" style={{ borderLeft: '3px solid #16a34a' }}>
+          <div className="sl">Уплачено ₸</div>
+          <div className="sv green" style={{ fontSize: 15 }}>{fmt(paidSum)} ₸</div>
+        </div>
+        <div className="stat" style={{ borderLeft: '3px solid #dc2626' }}>
+          <div className="sl">Остаток ₸</div>
+          <div className="sv red" style={{ fontSize: 15 }}>{fmt(unpaidSum)} ₸</div>
+        </div>
+      </div>
 
-          return (
-            <div key={p.q} style={{ background: '#fff', border: `1.5px solid ${isOverdue ? '#fecaca' : isSoon ? '#fde68a' : '#e5e7eb'}`, borderRadius: 12, overflow: 'hidden' }}>
-              <div style={{ padding: '12px 16px', background: isOverdue ? '#fef2f2' : isSoon ? '#fffbeb' : '#f8fafc', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: '#111827' }}>{p.q}</div>
-                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{p.label.split('(')[1]?.replace(')', '') || ''}</div>
-                </div>
-                <div style={{ textAlign: 'right' as const }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: isOverdue ? '#dc2626' : isSoon ? '#d97706' : '#374151' }}>
-                    Срок: {p.dueLabel}
-                  </div>
-                  {isOverdue && <div style={{ fontSize: 10, color: '#dc2626' }}>Просрочено на {Math.abs(daysLeft)} дн.</div>}
-                  {isSoon && !isOverdue && <div style={{ fontSize: 10, color: '#d97706' }}>Осталось {daysLeft} дн.</div>}
-                </div>
-              </div>
-
-              {t.sum > 0 && (
-                <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid #f3f4f6' }}>
-                  <div style={{ flex: 1, padding: '8px 16px', borderRight: '1px solid #f3f4f6' }}>
-                    <div style={{ fontSize: 10, color: '#9ca3af' }}>Всего к уплате</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{fmt(t.sum)} ₸</div>
-                  </div>
-                  <div style={{ flex: 1, padding: '8px 16px', borderRight: '1px solid #f3f4f6' }}>
-                    <div style={{ fontSize: 10, color: '#9ca3af' }}>Уплачено</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#16a34a' }}>{fmt(t.paidSum)} ₸</div>
-                  </div>
-                  <div style={{ flex: 1, padding: '8px 16px' }}>
-                    <div style={{ fontSize: 10, color: '#9ca3af' }}>Остаток</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: t.unpaidSum > 0 ? '#dc2626' : '#16a34a' }}>{fmt(t.unpaidSum)} ₸</div>
-                  </div>
-                </div>
-              )}
-
-              <div style={{ maxHeight: 320, overflowY: 'auto' as const }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' as const, fontSize: 12 }}>
-                  <thead>
-                    <tr style={{ background: '#f9fafb' }}>
-                      <th style={{ padding: '7px 12px', textAlign: 'left' as const, fontWeight: 600, color: '#6b7280', fontSize: 11, borderBottom: '1px solid #f3f4f6' }}>Компания</th>
-                      <th style={{ padding: '7px 8px', textAlign: 'right' as const, fontWeight: 600, color: '#6b7280', fontSize: 11, borderBottom: '1px solid #f3f4f6', whiteSpace: 'nowrap' as const }}>Сумма (₸)</th>
-                      <th style={{ padding: '7px 8px', textAlign: 'left' as const, fontWeight: 600, color: '#6b7280', fontSize: 11, borderBottom: '1px solid #f3f4f6' }}>Комментарий</th>
-                      <th style={{ padding: '7px 8px', textAlign: 'center' as const, fontWeight: 600, color: '#6b7280', fontSize: 11, borderBottom: '1px solid #f3f4f6' }}>Уплачен</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {list.map((c, ci) => {
-                      const key = `${c.n}|${paySubTab}|${p.q}|${payYear}`
-                      const e = payEntries[key] || { amount: '', comment: '', paid: false }
-                      return (
-                        <tr key={ci} style={{ borderBottom: '1px solid #f9fafb', background: e.paid ? '#f0fdf4' : undefined }}>
-                          <td style={{ padding: '6px 12px', color: '#374151', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }} title={c.n}>
-                            {c.n}
-                          </td>
-                          <td style={{ padding: '4px 8px' }}>
-                            <input
-                              type="text"
-                              value={e.amount}
-                              onChange={ev => onSave(key, { amount: ev.target.value })}
-                              placeholder="0"
-                              style={{ width: 100, fontSize: 12, padding: '4px 6px', border: '1px solid #e5e7eb', borderRadius: 6, textAlign: 'right' as const, outline: 'none', background: e.paid ? '#dcfce7' : '#fff' }}
-                            />
-                          </td>
-                          <td style={{ padding: '4px 8px' }}>
-                            <input
-                              type="text"
-                              value={e.comment}
-                              onChange={ev => onSave(key, { comment: ev.target.value })}
-                              placeholder="Заметка..."
-                              style={{ width: '100%', minWidth: 100, fontSize: 11, padding: '4px 6px', border: '1px solid #e5e7eb', borderRadius: 6, outline: 'none', color: '#6b7280' }}
-                            />
-                          </td>
-                          <td style={{ padding: '4px 8px', textAlign: 'center' as const }}>
-                            <input
-                              type="checkbox"
-                              checked={e.paid}
-                              onChange={ev => onSave(key, { paid: ev.target.checked })}
-                              style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#16a34a' }}
-                            />
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+      {/* ── Карточка квартала ── */}
+      <div style={{ background: '#fff', border: `1.5px solid ${isOverdue ? '#fecaca' : isSoon ? '#fde68a' : '#e5e7eb'}`, borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ padding: '12px 18px', background: isOverdue ? '#fef2f2' : isSoon ? '#fffbeb' : '#f8fafc', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>{p.q}</div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{p.label}</div>
+          </div>
+          <div style={{ textAlign: 'right' as const }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: isOverdue ? '#dc2626' : isSoon ? '#d97706' : '#374151' }}>
+              Срок уплаты: {p.dueLabel}
             </div>
-          )
-        })}
+            {isOverdue && <div style={{ fontSize: 11, color: '#dc2626', marginTop: 2 }}>Просрочено на {Math.abs(daysLeft)} дн.</div>}
+            {isSoon && !isOverdue && <div style={{ fontSize: 11, color: '#d97706', marginTop: 2 }}>Осталось {daysLeft} дн.</div>}
+          </div>
+        </div>
+
+        <div style={{ overflowY: 'auto' as const, maxHeight: 'calc(100vh - 360px)' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' as const, fontSize: 12 }}>
+            <thead style={{ position: 'sticky' as const, top: 0, zIndex: 1 }}>
+              <tr style={{ background: '#f9fafb' }}>
+                <th style={{ padding: '8px 16px', textAlign: 'left' as const, fontWeight: 600, color: '#6b7280', fontSize: 11, borderBottom: '1px solid #e5e7eb' }}>Компания</th>
+                <th style={{ padding: '8px 10px', textAlign: 'left' as const, fontWeight: 600, color: '#6b7280', fontSize: 11, borderBottom: '1px solid #e5e7eb' }}>Режим</th>
+                <th style={{ padding: '8px 10px', textAlign: 'right' as const, fontWeight: 600, color: '#6b7280', fontSize: 11, borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap' as const }}>Сумма (₸)</th>
+                <th style={{ padding: '8px 10px', textAlign: 'left' as const, fontWeight: 600, color: '#6b7280', fontSize: 11, borderBottom: '1px solid #e5e7eb' }}>Комментарий</th>
+                <th style={{ padding: '8px 10px', textAlign: 'center' as const, fontWeight: 600, color: '#6b7280', fontSize: 11, borderBottom: '1px solid #e5e7eb' }}>Уплачен</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((c, ci) => {
+                const key = `${c.n}|${paySubTab}|${p.q}|${payYear}`
+                const e = payEntries[key] || { amount: '', comment: '', paid: false }
+                return (
+                  <tr key={ci} style={{ borderBottom: '1px solid #f3f4f6', background: e.paid ? '#f0fdf4' : ci % 2 === 1 ? '#fafafa' : '#fff' }}>
+                    <td style={{ padding: '6px 16px', color: '#374151', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500 }} title={c.n}>
+                      {c.n}
+                    </td>
+                    <td style={{ padding: '6px 10px', color: '#9ca3af', fontSize: 11, whiteSpace: 'nowrap' as const }}>{c.reg}</td>
+                    <td style={{ padding: '4px 10px' }}>
+                      <input
+                        type="text"
+                        value={e.amount}
+                        onChange={ev => onSave(key, { amount: ev.target.value })}
+                        placeholder="0"
+                        style={{ width: 110, fontSize: 12, padding: '5px 8px', border: '1px solid #e5e7eb', borderRadius: 6, textAlign: 'right' as const, outline: 'none', background: e.paid ? '#dcfce7' : '#fff' }}
+                      />
+                    </td>
+                    <td style={{ padding: '4px 10px' }}>
+                      <input
+                        type="text"
+                        value={e.comment}
+                        onChange={ev => onSave(key, { comment: ev.target.value })}
+                        placeholder="Заметка..."
+                        style={{ width: '100%', minWidth: 120, fontSize: 11, padding: '5px 8px', border: '1px solid #e5e7eb', borderRadius: 6, outline: 'none', color: '#6b7280' }}
+                      />
+                    </td>
+                    <td style={{ padding: '4px 10px', textAlign: 'center' as const }}>
+                      <input
+                        type="checkbox"
+                        checked={e.paid}
+                        onChange={ev => onSave(key, { paid: ev.target.checked })}
+                        style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#16a34a' }}
+                      />
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )
