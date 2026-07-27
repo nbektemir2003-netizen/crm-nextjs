@@ -219,6 +219,10 @@ export default function DashboardPage() {
   const [repReg, setRepReg] = useState('')
   const [repStatus, setRepStatus] = useState('')
   const [repSubTab, setRepSubTab] = useState<'tax' | 'stat'>('tax')
+  const [repSearch, setRepSearch] = useState('')
+
+  // Поиск в уплате налогов
+  const [paySearch, setPaySearch] = useState('')
 
   // Администрирование
   const [adminSettings, setAdminSettings] = useState<AdminSettings>(DEFAULT_ADMIN)
@@ -594,6 +598,7 @@ export default function DashboardPage() {
       if (repReg && r.reg !== repReg) return false
       if (repStatus === 'done' && !repDone[repKey(r)]) return false
       if (repStatus === 'pending' && repDone[repKey(r)]) return false
+      if (repSearch && !r.co.toLowerCase().includes(repSearch.toLowerCase())) return false
       return true
     })
   }
@@ -948,6 +953,7 @@ export default function DashboardPage() {
           <button className="btn-sm" onClick={exportRepCSV} style={{ marginLeft: 'auto', background: '#fff', color: '#6366f1', border: '1px solid #c7d2fe' }}>⬇ Excel</button>
         </div>
         <div className="ff" style={{ marginBottom: 9 }}>
+          <input type="text" placeholder="Поиск компании..." value={repSearch} onChange={e => setRepSearch(e.target.value)} style={{ flex: 2, minWidth: 180 }} />
           <select value={repQ} onChange={e => setRepQ(e.target.value)}>
             <option value="">Все кварталы</option>
             <option>1 квартал</option><option>2 квартал</option><option>3 квартал</option><option>4 квартал</option><option>Годовой</option>
@@ -982,8 +988,10 @@ export default function DashboardPage() {
           payEntries={payEntries}
           payYear={payYear}
           paySubTab={paySubTab}
+          paySearch={paySearch}
           onYearChange={setPayYear}
           onSubTabChange={setPaySubTab}
+          onSearchChange={setPaySearch}
           onSave={savePayEntry}
         />
       </div>
@@ -1605,18 +1613,21 @@ function getPayPeriods(type: 'kpn' | 'nds', year: number) {
   ]
 }
 
-function PaySection({ companies, payEntries, payYear, paySubTab, onYearChange, onSubTabChange, onSave }: {
+function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYearChange, onSubTabChange, onSearchChange, onSave }: {
   companies: Company[]
   payEntries: Record<string, PayEntry>
   payYear: number
   paySubTab: 'kpn' | 'nds'
+  paySearch: string
   onYearChange: (y: number) => void
   onSubTabChange: (t: 'kpn' | 'nds') => void
+  onSearchChange: (s: string) => void
   onSave: (key: string, patch: Partial<PayEntry>) => void
 }) {
   const [selQ, setSelQ] = useState('1 квартал')
   const active = companies.filter(c => c.status === 'Активная')
-  const list = paySubTab === 'nds' ? active.filter(c => c.nds || c.reg === 'ОУР (НДС)') : active
+  const base = paySubTab === 'nds' ? active.filter(c => c.nds || c.reg === 'ОУР (НДС)') : active
+  const list = paySearch ? base.filter(c => c.n.toLowerCase().includes(paySearch.toLowerCase())) : base
   const periods = getPayPeriods(paySubTab, payYear)
   const p = periods.find(x => x.q === selQ) || periods[0]
 
@@ -1647,6 +1658,13 @@ function PaySection({ companies, payEntries, payYear, paySubTab, onYearChange, o
           <button className={`stab${paySubTab === 'kpn' ? ' active' : ''}`} onClick={() => onSubTabChange('kpn')}>КПН и ИПН</button>
           <button className={`stab${paySubTab === 'nds' ? ' active' : ''}`} onClick={() => onSubTabChange('nds')}>НДС</button>
         </div>
+        <input
+          type="text"
+          placeholder="Поиск компании..."
+          value={paySearch}
+          onChange={e => onSearchChange(e.target.value)}
+          style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#111827', minWidth: 200, outline: 'none' }}
+        />
         <select value={payYear} onChange={e => onYearChange(+e.target.value)} style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#111827' }}>
           <option value={2025}>2025 год</option>
           <option value={2026}>2026 год</option>
