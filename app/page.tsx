@@ -1736,7 +1736,7 @@ function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYe
                 const key = `${c.n}|${paySubTab}|${p.q}|${payYear}`
                 const e = payEntries[key] || { amount: '', comment: '', paid: false }
                 return (
-                  <tr key={ci} style={{ borderBottom: '1px solid #f3f4f6', background: e.paid ? '#f0fdf4' : ci % 2 === 1 ? '#fafafa' : '#fff' }}>
+                  <tr key={ci} style={{ borderBottom: '1px solid #f3f4f6', background: e.paid ? '#f0fdf4' : '#fff5f5' }}>
                     <td style={{ padding: '6px 16px', color: '#374151', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500 }} title={c.n}>
                       {c.n}
                     </td>
