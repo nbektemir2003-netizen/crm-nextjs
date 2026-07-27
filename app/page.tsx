@@ -186,6 +186,7 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [taxDone, setTaxDone] = useState<Record<string, boolean>>({})
   const [repDone, setRepDone] = useState<Record<string, boolean>>({})
+  const [repExtra, setRepExtra] = useState<Record<string, { comment: string; cabinet: boolean }>>({})
   const [syncText, setSyncText] = useState('Загрузка...')
   const [syncCls, setSyncCls] = useState<SyncCls>('syncing')
   const [toast, setToast] = useState('')
@@ -291,16 +292,17 @@ export default function DashboardPage() {
   async function loadData() {
     setSyncText('Загрузка...'); setSyncCls('syncing')
     try {
-      const [coRes, taskRes, tdRes, rdRes, peRes] = await Promise.all([
+      const [coRes, taskRes, tdRes, rdRes, peRes, reRes] = await Promise.all([
         fetch('/api/companies'), fetch('/api/tasks'),
         fetch('/api/taxdone'), fetch('/api/repdone'),
-        fetch('/api/payentries'),
+        fetch('/api/payentries'), fetch('/api/repextra'),
       ])
       if (coRes.ok) { const d = await coRes.json(); if (Array.isArray(d)) setCompanies(d) }
       if (taskRes.ok) { const d = await taskRes.json(); if (Array.isArray(d)) setTasks(d) }
       if (tdRes.ok) { const d = await tdRes.json(); if (d && !d.error) setTaxDone(d) }
       if (rdRes.ok) { const d = await rdRes.json(); if (d && !d.error) setRepDone(d) }
       if (peRes.ok) { const d = await peRes.json(); if (d && !d.error) setPayEntries(d) }
+      if (reRes.ok) { const d = await reRes.json(); if (d && !d.error) setRepExtra(d) }
       setSyncText('Синхронизировано ✓'); setSyncCls('')
     } catch {
       setSyncText('Офлайн режим'); setSyncCls('error')
@@ -317,6 +319,17 @@ export default function DashboardPage() {
     const updated = { ...existing, ...patch }
     setPayEntries(nd => ({ ...nd, [key]: updated }))
     fetch('/api/payentries', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([{ key, ...updated }]),
+    })
+  }
+
+  function saveRepExtra(key: string, patch: Partial<{ comment: string; cabinet: boolean }>) {
+    const existing = repExtra[key] || { comment: '', cabinet: false }
+    const updated = { ...existing, ...patch }
+    setRepExtra(nd => ({ ...nd, [key]: updated }))
+    fetch('/api/repextra', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify([{ key, ...updated }]),
@@ -973,8 +986,10 @@ export default function DashboardPage() {
           taxDone={taxDone}
           repYear={repYear}
           repQ={repQ} repReg={repReg} repStatus={repStatus} repSearch={repSearch}
+          repExtra={repExtra}
           onToggleRep={toggleRep}
           onToggleMonthTax={toggleMonthTax}
+          onSaveRepExtra={saveRepExtra}
           onEditCompany={(name) => { const co = companies.find(c => c.n === name); if (co) { setEditCoData({ ...co }); setEditCoIdx(companies.findIndex(c => c.n === name)) } }}
           QLABELS={QLABELS}
         />
@@ -1227,10 +1242,12 @@ function TaxSection({ companies, taxDone, taxMonth, taxYear, taxFreq, onToggle, 
 }
 
 // ─── КОМПОНЕНТ: ОТЧЁТНОСТЬ ──────────────
-function ReportsSection({ reports, repDone, taxDone, repYear, repQ, repReg, repStatus, repSearch, onToggleRep, onToggleMonthTax, onEditCompany, QLABELS }: {
+function ReportsSection({ reports, repDone, taxDone, repYear, repQ, repReg, repStatus, repSearch, repExtra, onToggleRep, onToggleMonthTax, onSaveRepExtra, onEditCompany, QLABELS }: {
   reports: RepEntry[]; repDone: Record<string, boolean>; taxDone: Record<string, boolean>
   repYear: number; repQ: string; repReg: string; repStatus: string; repSearch?: string
+  repExtra: Record<string, { comment: string; cabinet: boolean }>
   onToggleRep: (key: string) => void; onToggleMonthTax: (key: string) => void
+  onSaveRepExtra: (key: string, patch: Partial<{ comment: string; cabinet: boolean }>) => void
   onEditCompany: (name: string) => void; QLABELS: Record<string, string>
 }) {
   const today = new Date(); today.setHours(0, 0, 0, 0)
@@ -1274,12 +1291,14 @@ function ReportsSection({ reports, repDone, taxDone, repYear, repQ, repReg, repS
               <table>
                 <thead>
                   <tr>
-                    <th style={{ width: '26%' }}>Организация</th>
-                    <th style={{ width: '14%' }}>Режим</th>
-                    <th style={{ width: '14%' }}>Отчёт</th>
-                    <th style={{ width: '8%' }} className="center">Срок</th>
-                    <th style={{ width: '10%' }} className="center">Статус</th>
-                    {months.map(m => <th key={m} style={{ width: '9%' }} className="center">{MN_S[m]}</th>)}
+                    <th style={{ width: '20%' }}>Организация</th>
+                    <th style={{ width: '10%' }}>Режим</th>
+                    <th style={{ width: '10%' }}>Отчёт</th>
+                    <th style={{ width: '7%' }} className="center">Срок</th>
+                    <th style={{ width: '8%' }} className="center">Статус</th>
+                    <th style={{ width: '8%' }} className="center">В кабинете</th>
+                    <th style={{ width: '18%' }}>Комментарий</th>
+                    {months.map(m => <th key={m} style={{ width: '7%' }} className="center">{MN_S[m]}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -1290,6 +1309,7 @@ function ReportsSection({ reports, repDone, taxDone, repYear, repQ, repReg, repS
                     const dt = done ? '✓ сдан' : d < 0 ? `просроч.${Math.abs(d)}д` : `${d} дн.`
                     const tc = r.type.includes('910') ? 'bt' : r.type.includes('300') ? 'br' : r.type.includes('200') ? 'bp' : 'ba'
                     const sk = done ? { textDecoration: 'line-through' as const, color: '#b4b2a9' } : {}
+                    const extra = repExtra[rowKey] || { comment: '', cabinet: false }
                     return (
                       <tr key={i}>
                         <td style={{ fontWeight: 500, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', ...sk }} title={`${r.co} — нажмите для редактирования`}>
@@ -1305,6 +1325,23 @@ function ReportsSection({ reports, repDone, taxDone, repYear, repQ, repReg, repS
                           <div className={`tax-cell ${done ? 'tax-paid' : 'tax-unpaid'}`} onClick={() => onToggleRep(rowKey)} style={{ cursor: 'pointer' }}>
                             {done ? '✓ сдан' : '✗ не сдан'}
                           </div>
+                        </td>
+                        <td className="center">
+                          <input
+                            type="checkbox"
+                            checked={extra.cabinet}
+                            onChange={e => onSaveRepExtra(rowKey, { cabinet: e.target.checked })}
+                            style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#4f46e5' }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            value={extra.comment}
+                            placeholder="Заметка..."
+                            onChange={e => onSaveRepExtra(rowKey, { comment: e.target.value })}
+                            style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 4, padding: '3px 6px', fontSize: 11, background: 'transparent', color: 'inherit' }}
+                          />
                         </td>
                         {months.map(m => {
                           if (!r.months) return <td key={m} className="center"><span style={{ color: '#b4b2a9', fontSize: 10 }}>—</span></td>
