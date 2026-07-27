@@ -134,6 +134,7 @@ function buildReports(companies: Company[], year: number, admin: AdminSettings):
     const r = c.reg
     const skip = c.skipReports || []
     const extra = c.extraReports || []
+    const has200skipped = skip.some(s => s.includes('200'))
     for (const rep of (admin.taxReports[r] || [])) {
       if (skip.includes(rep.code)) continue
       if (rep.period === 'annual') {
@@ -141,7 +142,8 @@ function buildReports(companies: Company[], year: number, admin: AdminSettings):
       } else {
         for (const qt of QTRS) {
           if (rep.onlyEvenQ && !qt.has910) continue
-          tax.push({ co: c.n, reg: r, type: rep.code, q: qt.q, due: qt.due200, months: rep.hasMonths ? QM[qt.q] : null })
+          const showMonths = rep.hasMonths || (rep.code.includes('910') && has200skipped)
+          tax.push({ co: c.n, reg: r, type: rep.code, q: qt.q, due: qt.due200, months: showMonths ? QM[qt.q] : null })
         }
       }
     }
