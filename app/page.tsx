@@ -292,17 +292,28 @@ export default function DashboardPage() {
   async function loadData() {
     setSyncText('Загрузка...'); setSyncCls('syncing')
     try {
-      const [coRes, taskRes, tdRes, rdRes, peRes, reRes] = await Promise.all([
+      const [coRes, taskRes, tdRes, rdRes, peRes, reRes, crRes] = await Promise.all([
         fetch('/api/companies'), fetch('/api/tasks'),
         fetch('/api/taxdone'), fetch('/api/repdone'),
         fetch('/api/payentries'), fetch('/api/repextra'),
+        fetch('/api/company-reports'),
       ])
-      if (coRes.ok) { const d = await coRes.json(); if (Array.isArray(d)) setCompanies(d) }
       if (taskRes.ok) { const d = await taskRes.json(); if (Array.isArray(d)) setTasks(d) }
       if (tdRes.ok) { const d = await tdRes.json(); if (d && !d.error) setTaxDone(d) }
       if (rdRes.ok) { const d = await rdRes.json(); if (d && !d.error) setRepDone(d) }
       if (peRes.ok) { const d = await peRes.json(); if (d && !d.error) setPayEntries(d) }
       if (reRes.ok) { const d = await reRes.json(); if (d && !d.error) setRepExtra(d) }
+      if (coRes.ok) {
+        const cos = await coRes.json()
+        if (Array.isArray(cos)) {
+          const cr = crRes.ok ? (await crRes.json()) : {}
+          setCompanies(cos.map((c: Company) => ({
+            ...c,
+            skipReports: cr[c.id!]?.skipReports || [],
+            extraReports: cr[c.id!]?.extraReports || [],
+          })))
+        }
+      }
       setSyncText('Синхронизировано ✓'); setSyncCls('')
     } catch {
       setSyncText('Офлайн режим'); setSyncCls('error')
@@ -389,8 +400,17 @@ export default function DashboardPage() {
     if (!editCoData) return
     setSyncText('Сохранение...'); setSyncCls('syncing')
     if (editCoData.id) {
-      const res = await fetch('/api/companies', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editCoData) })
-      if (res.ok) { const updated = await res.json(); setCompanies(prev => prev.map(c => c.id === updated.id ? updated : c)) }
+      const [res] = await Promise.all([
+        fetch('/api/companies', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editCoData) }),
+        fetch('/api/company-reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editCoData.id, skipReports: editCoData.skipReports || [], extraReports: editCoData.extraReports || [] }) }),
+      ])
+      if (res.ok) {
+        const updated = await res.json()
+        setCompanies(prev => prev.map(c => c.id === updated.id
+          ? { ...updated, skipReports: editCoData.skipReports || [], extraReports: editCoData.extraReports || [] }
+          : c
+        ))
+      }
     }
     setEditCoIdx(-1); setEditCoData(null)
     setSyncText('Синхронизировано ✓'); setSyncCls('')
