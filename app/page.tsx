@@ -1322,8 +1322,15 @@ function ReportsSection({ reports, repDone, taxDone, repYear, repQ, repReg, repS
                         </td>
                         <td className="center"><span style={{ fontSize: 10, color: '#888780' }}>{r.due.slice(5)}</span></td>
                         <td className="center">
-                          <div className={`tax-cell ${done ? 'tax-paid' : 'tax-unpaid'}`} onClick={() => onToggleRep(rowKey)} style={{ cursor: 'pointer' }}>
-                            {done ? '✓ сдан' : '✗ не сдан'}
+                          <div
+                            className={`tax-cell ${done ? 'tax-paid' : extra.cabinet ? '' : 'tax-unpaid'}`}
+                            onClick={() => onToggleRep(rowKey)}
+                            style={{
+                              cursor: 'pointer',
+                              ...((!done && extra.cabinet) ? { background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' } : {}),
+                            }}
+                          >
+                            {done ? '✓ сдан' : extra.cabinet ? '📋 готов' : '✗ не сдан'}
                           </div>
                         </td>
                         <td className="center">
