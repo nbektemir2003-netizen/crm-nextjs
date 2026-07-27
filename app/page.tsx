@@ -610,7 +610,8 @@ export default function DashboardPage() {
       if (repQ && r.q !== repQ) return false
       if (repReg && r.reg !== repReg) return false
       if (repStatus === 'done' && !repDone[repKey(r)]) return false
-      if (repStatus === 'pending' && repDone[repKey(r)]) return false
+      if (repStatus === 'pending' && (repDone[repKey(r)] || repExtra[repKey(r)]?.cabinet)) return false
+      if (repStatus === 'ready' && (repDone[repKey(r)] || !repExtra[repKey(r)]?.cabinet)) return false
       if (repSearch && !r.co.toLowerCase().includes(repSearch.toLowerCase())) return false
       return true
     })
@@ -977,7 +978,7 @@ export default function DashboardPage() {
           </select>
           <select value={repStatus} onChange={e => setRepStatus(e.target.value)}>
             <option value="">Все статусы</option>
-            <option value="pending">Не сдан</option><option value="done">Сдан</option>
+            <option value="pending">Не сдан</option><option value="ready">Готов</option><option value="done">Сдан</option>
           </select>
         </div>
         <ReportsSection
@@ -1262,7 +1263,8 @@ function ReportsSection({ reports, repDone, taxDone, repYear, repQ, repReg, repS
     if (repReg && r.reg !== repReg) return false
     if (repQ && r.q !== repQ) return false
     if (repStatus === 'done' && !repDone[rKey(r)]) return false
-    if (repStatus === 'pending' && repDone[rKey(r)]) return false
+    if (repStatus === 'pending' && (repDone[rKey(r)] || repExtra[rKey(r)]?.cabinet)) return false
+    if (repStatus === 'ready' && (repDone[rKey(r)] || !repExtra[rKey(r)]?.cabinet)) return false
     if (repSearch && !r.co.toLowerCase().includes(repSearch.toLowerCase())) return false
     return true
   })
