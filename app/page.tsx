@@ -7,7 +7,8 @@ import * as XLSX from 'xlsx'
 // ─── ТИПЫ ───────────────────────────────
 type Company = { id?: string; n: string; freq: string; reg: string; cat: string; b: string; risk: string; nds: boolean; status: string; skipReports: string[]; extraReports: string[] }
 type Task = { id?: string; co: string; desc: string; emp: string; prio: string; date: string; st: string }
-type TabId = 'co' | 'tasks' | 'tax' | 'rep' | 'admin'
+type TabId = 'co' | 'tasks' | 'tax' | 'rep' | 'pay' | 'admin'
+type PayEntry = { amount: string; comment: string; paid: boolean }
 type AdminReportItem = { code: string; period: 'quarterly' | 'annual' | 'monthly'; hasMonths: boolean; onlyEvenQ?: boolean }
 type AdminSettings = {
   regimes: string[]; categories: string[]; groups: string[]; bases: string[]; statuses: string[]; risks: string[]
@@ -223,6 +224,11 @@ export default function DashboardPage() {
   const [adminSettings, setAdminSettings] = useState<AdminSettings>(DEFAULT_ADMIN)
   const [adminSubTab, setAdminSubTab] = useState<'refs' | 'tax' | 'stat'>('refs')
 
+  // Уплата налогов (КПН/ИПН/НДС)
+  const [payEntries, setPayEntries] = useState<Record<string, PayEntry>>({})
+  const [payYear, setPayYear] = useState(2026)
+  const [paySubTab, setPaySubTab] = useState<'kpn' | 'nds'>('kpn')
+
   // Форма новой задачи
   const [newTaskCo, setNewTaskCo] = useState('')
   const [newTaskEmp, setNewTaskEmp] = useState(users[0] || '')
@@ -276,6 +282,8 @@ export default function DashboardPage() {
     if (ct) try { setCoTaxContacts(JSON.parse(ct)) } catch {}
     const as = localStorage.getItem('crm_adminSettings')
     if (as) try { setAdminSettings(JSON.parse(as)) } catch {}
+    const pe = localStorage.getItem('crm_payEntries')
+    if (pe) try { setPayEntries(JSON.parse(pe)) } catch {}
   }, [])
 
   async function loadData() {
@@ -298,6 +306,13 @@ export default function DashboardPage() {
   function showToast(msg: string) {
     setToast(msg); setToastVisible(true)
     setTimeout(() => setToastVisible(false), 2500)
+  }
+
+  function savePayEntry(key: string, patch: Partial<PayEntry>) {
+    const existing: PayEntry = payEntries[key] || { amount: '', comment: '', paid: false }
+    const nd = { ...payEntries, [key]: { ...existing, ...patch } }
+    setPayEntries(nd)
+    localStorage.setItem('crm_payEntries', JSON.stringify(nd))
   }
 
   function saveTaxDone(nd: Record<string, boolean>, changedKeys?: string[]) {
@@ -605,7 +620,7 @@ export default function DashboardPage() {
         </div>
 
         <nav className="crm-sidebar-nav">
-          {([['co', 'ti-building', 'Компании'], ['tasks', 'ti-checklist', 'Задачи'], ['tax', 'ti-cash', 'Налоги'], ['rep', 'ti-file-check', 'Отчётность']] as [TabId, string, string][]).map(([id, icon, label]) => (
+          {([['co', 'ti-building', 'Компании'], ['tasks', 'ti-checklist', 'Задачи'], ['tax', 'ti-cash', 'Налоги'], ['rep', 'ti-file-check', 'Отчётность'], ['pay', 'ti-coin', 'Уплата налогов']] as [TabId, string, string][]).map(([id, icon, label]) => (
             <button key={id} className={`crm-tab${tab === id ? ' active' : ''}`} onClick={() => setTab(id)}>
               <i className={`ti ${icon}`}></i>{label}
             </button>
@@ -633,7 +648,7 @@ export default function DashboardPage() {
         {/* Топбар */}
         <div className="crm-topbar">
           <span className="crm-topbar-title">
-            {tab === 'co' ? 'Компании' : tab === 'tasks' ? 'Задачи' : tab === 'tax' ? 'Налоги' : tab === 'rep' ? 'Отчётность' : 'Администрирование'}
+            {tab === 'co' ? 'Компании' : tab === 'tasks' ? 'Задачи' : tab === 'tax' ? 'Налоги' : tab === 'rep' ? 'Отчётность' : tab === 'pay' ? 'Уплата налогов' : 'Администрирование'}
           </span>
           <div className="crm-topbar-actions">
             <span className={`sync-status ${syncCls}`}>{syncText}</span>
@@ -955,6 +970,19 @@ export default function DashboardPage() {
         />
       </div>
 
+
+      {/* ═══════════════ УПЛАТА НАЛОГОВ ═══════════════ */}
+      <div className={`crm-sec${tab === 'pay' ? ' active' : ''}`}>
+        <PaySection
+          companies={companies}
+          payEntries={payEntries}
+          payYear={payYear}
+          paySubTab={paySubTab}
+          onYearChange={setPayYear}
+          onSubTabChange={setPaySubTab}
+          onSave={savePayEntry}
+        />
+      </div>
 
       {/* ═══════════════ АДМИНИСТРИРОВАНИЕ ═══════════════ */}
       {isAdmin && (
@@ -1551,6 +1579,167 @@ function AdminSection({ adminSettings, onSave }: { adminSettings: AdminSettings;
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── УПЛАТА НАЛОГОВ ─────────────────────────────────────────────────────────
+function getPayPeriods(type: 'kpn' | 'nds', year: number) {
+  if (type === 'kpn') {
+    return [
+      { q: '1 квартал', label: `1 квартал (янв–март ${year})`, due: `${year}-05-25`, dueLabel: `25 мая ${year}` },
+      { q: '2 квартал', label: `2 квартал (апр–июнь ${year})`, due: `${year}-08-25`, dueLabel: `25 августа ${year}` },
+      { q: '3 квартал', label: `3 квартал (июль–сент ${year})`, due: `${year}-11-25`, dueLabel: `25 ноября ${year}` },
+      { q: '4 квартал', label: `4 квартал (окт–дек ${year})`, due: `${year + 1}-02-25`, dueLabel: `25 февраля ${year + 1}` },
+    ]
+  }
+  return [
+    { q: '1 квартал', label: `1 квартал (янв–март ${year})`, due: `${year}-04-25`, dueLabel: `25 апреля ${year}` },
+    { q: '2 квартал', label: `2 квартал (апр–июнь ${year})`, due: `${year}-07-25`, dueLabel: `25 июля ${year}` },
+    { q: '3 квартал', label: `3 квартал (июль–сент ${year})`, due: `${year}-10-25`, dueLabel: `25 октября ${year}` },
+    { q: '4 квартал', label: `4 квартал (окт–дек ${year})`, due: `${year + 1}-01-25`, dueLabel: `25 января ${year + 1}` },
+  ]
+}
+
+function PaySection({ companies, payEntries, payYear, paySubTab, onYearChange, onSubTabChange, onSave }: {
+  companies: Company[]
+  payEntries: Record<string, PayEntry>
+  payYear: number
+  paySubTab: 'kpn' | 'nds'
+  onYearChange: (y: number) => void
+  onSubTabChange: (t: 'kpn' | 'nds') => void
+  onSave: (key: string, patch: Partial<PayEntry>) => void
+}) {
+  const active = companies.filter(c => c.status === 'Активная')
+  const list = paySubTab === 'nds' ? active.filter(c => c.nds || c.reg === 'ОУР (НДС)') : active
+  const periods = getPayPeriods(paySubTab, payYear)
+
+  const totals = periods.map(p => {
+    let sum = 0, paidSum = 0, paidCount = 0
+    list.forEach(c => {
+      const key = `${c.n}|${paySubTab}|${p.q}|${payYear}`
+      const e = payEntries[key]
+      const amt = e ? parseFloat(e.amount.replace(/\s/g, '').replace(',', '.')) || 0 : 0
+      sum += amt
+      if (e?.paid) { paidSum += amt; paidCount++ }
+    })
+    return { sum, paidSum, unpaidSum: sum - paidSum, paidCount }
+  })
+
+  const fmt = (n: number) => n > 0 ? n.toLocaleString('ru-RU') : '—'
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' as const }}>
+        <div className="stabs" style={{ marginBottom: 0 }}>
+          <button className={`stab${paySubTab === 'kpn' ? ' active' : ''}`} onClick={() => onSubTabChange('kpn')}>КПН и ИПН</button>
+          <button className={`stab${paySubTab === 'nds' ? ' active' : ''}`} onClick={() => onSubTabChange('nds')}>НДС</button>
+        </div>
+        <select value={payYear} onChange={e => onYearChange(+e.target.value)} style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#111827' }}>
+          <option value={2025}>2025 год</option>
+          <option value={2026}>2026 год</option>
+          <option value={2027}>2027 год</option>
+        </select>
+        <span style={{ fontSize: 12, color: '#6b7280' }}>Компаний: {list.length}</span>
+      </div>
+
+      <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fill, minmax(480px, 1fr))' }}>
+        {periods.map((p, pi) => {
+          const today = new Date(); today.setHours(0, 0, 0, 0)
+          const dueDate = new Date(p.due); dueDate.setHours(0, 0, 0, 0)
+          const daysLeft = Math.round((dueDate.getTime() - today.getTime()) / 86400000)
+          const isOverdue = daysLeft < 0
+          const isSoon = daysLeft >= 0 && daysLeft <= 7
+          const t = totals[pi]
+
+          return (
+            <div key={p.q} style={{ background: '#fff', border: `1.5px solid ${isOverdue ? '#fecaca' : isSoon ? '#fde68a' : '#e5e7eb'}`, borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', background: isOverdue ? '#fef2f2' : isSoon ? '#fffbeb' : '#f8fafc', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: '#111827' }}>{p.q}</div>
+                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{p.label.split('(')[1]?.replace(')', '') || ''}</div>
+                </div>
+                <div style={{ textAlign: 'right' as const }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: isOverdue ? '#dc2626' : isSoon ? '#d97706' : '#374151' }}>
+                    Срок: {p.dueLabel}
+                  </div>
+                  {isOverdue && <div style={{ fontSize: 10, color: '#dc2626' }}>Просрочено на {Math.abs(daysLeft)} дн.</div>}
+                  {isSoon && !isOverdue && <div style={{ fontSize: 10, color: '#d97706' }}>Осталось {daysLeft} дн.</div>}
+                </div>
+              </div>
+
+              {t.sum > 0 && (
+                <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid #f3f4f6' }}>
+                  <div style={{ flex: 1, padding: '8px 16px', borderRight: '1px solid #f3f4f6' }}>
+                    <div style={{ fontSize: 10, color: '#9ca3af' }}>Всего к уплате</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{fmt(t.sum)} ₸</div>
+                  </div>
+                  <div style={{ flex: 1, padding: '8px 16px', borderRight: '1px solid #f3f4f6' }}>
+                    <div style={{ fontSize: 10, color: '#9ca3af' }}>Уплачено</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#16a34a' }}>{fmt(t.paidSum)} ₸</div>
+                  </div>
+                  <div style={{ flex: 1, padding: '8px 16px' }}>
+                    <div style={{ fontSize: 10, color: '#9ca3af' }}>Остаток</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: t.unpaidSum > 0 ? '#dc2626' : '#16a34a' }}>{fmt(t.unpaidSum)} ₸</div>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ maxHeight: 320, overflowY: 'auto' as const }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' as const, fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: '#f9fafb' }}>
+                      <th style={{ padding: '7px 12px', textAlign: 'left' as const, fontWeight: 600, color: '#6b7280', fontSize: 11, borderBottom: '1px solid #f3f4f6' }}>Компания</th>
+                      <th style={{ padding: '7px 8px', textAlign: 'right' as const, fontWeight: 600, color: '#6b7280', fontSize: 11, borderBottom: '1px solid #f3f4f6', whiteSpace: 'nowrap' as const }}>Сумма (₸)</th>
+                      <th style={{ padding: '7px 8px', textAlign: 'left' as const, fontWeight: 600, color: '#6b7280', fontSize: 11, borderBottom: '1px solid #f3f4f6' }}>Комментарий</th>
+                      <th style={{ padding: '7px 8px', textAlign: 'center' as const, fontWeight: 600, color: '#6b7280', fontSize: 11, borderBottom: '1px solid #f3f4f6' }}>Уплачен</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {list.map((c, ci) => {
+                      const key = `${c.n}|${paySubTab}|${p.q}|${payYear}`
+                      const e = payEntries[key] || { amount: '', comment: '', paid: false }
+                      return (
+                        <tr key={ci} style={{ borderBottom: '1px solid #f9fafb', background: e.paid ? '#f0fdf4' : undefined }}>
+                          <td style={{ padding: '6px 12px', color: '#374151', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }} title={c.n}>
+                            {c.n}
+                          </td>
+                          <td style={{ padding: '4px 8px' }}>
+                            <input
+                              type="text"
+                              value={e.amount}
+                              onChange={ev => onSave(key, { amount: ev.target.value })}
+                              placeholder="0"
+                              style={{ width: 100, fontSize: 12, padding: '4px 6px', border: '1px solid #e5e7eb', borderRadius: 6, textAlign: 'right' as const, outline: 'none', background: e.paid ? '#dcfce7' : '#fff' }}
+                            />
+                          </td>
+                          <td style={{ padding: '4px 8px' }}>
+                            <input
+                              type="text"
+                              value={e.comment}
+                              onChange={ev => onSave(key, { comment: ev.target.value })}
+                              placeholder="Заметка..."
+                              style={{ width: '100%', minWidth: 100, fontSize: 11, padding: '4px 6px', border: '1px solid #e5e7eb', borderRadius: 6, outline: 'none', color: '#6b7280' }}
+                            />
+                          </td>
+                          <td style={{ padding: '4px 8px', textAlign: 'center' as const }}>
+                            <input
+                              type="checkbox"
+                              checked={e.paid}
+                              onChange={ev => onSave(key, { paid: ev.target.checked })}
+                              style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#16a34a' }}
+                            />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
