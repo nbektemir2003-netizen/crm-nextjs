@@ -282,21 +282,21 @@ export default function DashboardPage() {
     if (ct) try { setCoTaxContacts(JSON.parse(ct)) } catch {}
     const as = localStorage.getItem('crm_adminSettings')
     if (as) try { setAdminSettings(JSON.parse(as)) } catch {}
-    const pe = localStorage.getItem('crm_payEntries')
-    if (pe) try { setPayEntries(JSON.parse(pe)) } catch {}
   }, [])
 
   async function loadData() {
     setSyncText('Загрузка...'); setSyncCls('syncing')
     try {
-      const [coRes, taskRes, tdRes, rdRes] = await Promise.all([
+      const [coRes, taskRes, tdRes, rdRes, peRes] = await Promise.all([
         fetch('/api/companies'), fetch('/api/tasks'),
         fetch('/api/taxdone'), fetch('/api/repdone'),
+        fetch('/api/payentries'),
       ])
       if (coRes.ok) { const d = await coRes.json(); if (Array.isArray(d)) setCompanies(d) }
       if (taskRes.ok) { const d = await taskRes.json(); if (Array.isArray(d)) setTasks(d) }
       if (tdRes.ok) { const d = await tdRes.json(); if (d && !d.error) setTaxDone(d) }
       if (rdRes.ok) { const d = await rdRes.json(); if (d && !d.error) setRepDone(d) }
+      if (peRes.ok) { const d = await peRes.json(); if (d && !d.error) setPayEntries(d) }
       setSyncText('Синхронизировано ✓'); setSyncCls('')
     } catch {
       setSyncText('Офлайн режим'); setSyncCls('error')
@@ -310,9 +310,13 @@ export default function DashboardPage() {
 
   function savePayEntry(key: string, patch: Partial<PayEntry>) {
     const existing: PayEntry = payEntries[key] || { amount: '', comment: '', paid: false }
-    const nd = { ...payEntries, [key]: { ...existing, ...patch } }
-    setPayEntries(nd)
-    localStorage.setItem('crm_payEntries', JSON.stringify(nd))
+    const updated = { ...existing, ...patch }
+    setPayEntries(nd => ({ ...nd, [key]: updated }))
+    fetch('/api/payentries', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([{ key, ...updated }]),
+    })
   }
 
   function saveTaxDone(nd: Record<string, boolean>, changedKeys?: string[]) {
