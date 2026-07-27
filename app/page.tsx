@@ -398,16 +398,19 @@ export default function DashboardPage() {
 
   async function saveCoEdit() {
     if (!editCoData) return
+    const snapshot = editCoData  // capture before any async work
     setSyncText('Сохранение...'); setSyncCls('syncing')
-    if (editCoData.id) {
+    if (snapshot.id) {
       const [res] = await Promise.all([
-        fetch('/api/companies', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editCoData) }),
-        fetch('/api/company-reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editCoData.id, skipReports: editCoData.skipReports || [], extraReports: editCoData.extraReports || [] }) }),
+        fetch('/api/companies', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(snapshot) }),
+        fetch('/api/company-reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: snapshot.id, skipReports: snapshot.skipReports || [], extraReports: snapshot.extraReports || [] }) }),
       ])
       if (res.ok) {
         const updated = await res.json()
+        const skip = snapshot.skipReports || []
+        const extra = snapshot.extraReports || []
         setCompanies(prev => prev.map(c => c.id === updated.id
-          ? { ...updated, skipReports: editCoData.skipReports || [], extraReports: editCoData.extraReports || [] }
+          ? { ...updated, skipReports: skip, extraReports: extra }
           : c
         ))
       }

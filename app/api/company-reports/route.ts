@@ -15,9 +15,14 @@ async function readFile(): Promise<Record<string, CoReports>> {
 
 async function writeFile(payload: Record<string, CoReports>) {
   const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' })
-  await supabaseAdmin.storage.from(BUCKET).upload(FILE, blob, {
+  const { error } = await supabaseAdmin.storage.from(BUCKET).update(FILE, blob, {
     contentType: 'application/json', upsert: true,
   })
+  if (error) {
+    await supabaseAdmin.storage.from(BUCKET).upload(FILE, blob, {
+      contentType: 'application/json', upsert: true,
+    })
+  }
 }
 
 export async function GET() {
