@@ -972,7 +972,7 @@ export default function DashboardPage() {
           repDone={repDone}
           taxDone={taxDone}
           repYear={repYear}
-          repQ={repQ} repReg={repReg} repStatus={repStatus}
+          repQ={repQ} repReg={repReg} repStatus={repStatus} repSearch={repSearch}
           onToggleRep={toggleRep}
           onToggleMonthTax={toggleMonthTax}
           onEditCompany={(name) => { const co = companies.find(c => c.n === name); if (co) { setEditCoData({ ...co }); setEditCoIdx(companies.findIndex(c => c.n === name)) } }}
@@ -1227,9 +1227,9 @@ function TaxSection({ companies, taxDone, taxMonth, taxYear, taxFreq, onToggle, 
 }
 
 // ─── КОМПОНЕНТ: ОТЧЁТНОСТЬ ──────────────
-function ReportsSection({ reports, repDone, taxDone, repYear, repQ, repReg, repStatus, onToggleRep, onToggleMonthTax, onEditCompany, QLABELS }: {
+function ReportsSection({ reports, repDone, taxDone, repYear, repQ, repReg, repStatus, repSearch, onToggleRep, onToggleMonthTax, onEditCompany, QLABELS }: {
   reports: RepEntry[]; repDone: Record<string, boolean>; taxDone: Record<string, boolean>
-  repYear: number; repQ: string; repReg: string; repStatus: string
+  repYear: number; repQ: string; repReg: string; repStatus: string; repSearch?: string
   onToggleRep: (key: string) => void; onToggleMonthTax: (key: string) => void
   onEditCompany: (name: string) => void; QLABELS: Record<string, string>
 }) {
@@ -1246,6 +1246,7 @@ function ReportsSection({ reports, repDone, taxDone, repYear, repQ, repReg, repS
     if (repQ && r.q !== repQ) return false
     if (repStatus === 'done' && !repDone[rKey(r)]) return false
     if (repStatus === 'pending' && repDone[rKey(r)]) return false
+    if (repSearch && !r.co.toLowerCase().includes(repSearch.toLowerCase())) return false
     return true
   })
   const byQ: Record<string, RepEntry[]> = {}
