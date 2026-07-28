@@ -45,7 +45,7 @@ const DEFAULT_ADMIN: AdminSettings = {
   categories: ['КАФЕШКИ', 'ПЕРЕПРОДАЖА', 'ПРОИЗВОДСТВО', 'СТРОИТЕЛЬСТВО', 'ПРОЧИЕ УСЛУГИ', 'ИП-ЖОО', 'Школы JOO', 'РАЗОВОЕ', 'ПРОЧЕЕ'],
   groups: ['Ежедневная', 'Раз в месяц', 'Квартальная', 'Разовая', 'На закрытие'],
   bases: ['БАР', 'ЖОҚ'],
-  statuses: ['Активная', 'Приостановлена', 'На закрытие'],
+  statuses: ['Активная', 'Приостановлена', 'На закрытие', 'Закрыто'],
   risks: ['низкая', 'средняя', 'высокая'],
   taxReports: {
     'ОУР (НДС)': [
@@ -845,7 +845,7 @@ export default function DashboardPage() {
               </div>
               <div className="fg"><label>Статус</label>
                 <select value={newCoStatus} onChange={e => setNewCoStatus(e.target.value)}>
-                  <option value="Активная">Активная</option><option value="Приостановлена">Приостановлена</option><option value="На закрытие">На закрытие</option>
+                  <option value="Активная">Активная</option><option value="Приостановлена">Приостановлена</option><option value="На закрытие">На закрытие</option><option value="Закрыто">Закрыто</option>
                 </select>
               </div>
             </div>
@@ -1252,7 +1252,7 @@ export default function DashboardPage() {
               </div>
               <div className="fg"><label>Статус</label>
                 <select value={editCoData.status} onChange={e => setEditCoData(p => p ? { ...p, status: e.target.value } : p)}>
-                  <option value="Активная">Активная</option><option value="Приостановлена">Приостановлена</option><option value="На закрытие">На закрытие</option>
+                  <option value="Активная">Активная</option><option value="Приостановлена">Приостановлена</option><option value="На закрытие">На закрытие</option><option value="Закрыто">Закрыто</option>
                 </select>
               </div>
             </div>
