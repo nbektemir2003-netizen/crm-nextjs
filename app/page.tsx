@@ -1175,7 +1175,7 @@ export default function DashboardPage() {
           repDone={repDone}
           taxDone={taxDone}
           repYear={repYear}
-          repQ={repQ} repReg={repReg} repStatus={repStatus} repSearch={repSearch}
+          repQ={repQ} repReg={repReg} repStatus={repStatus} repSearch={repSearch} repType={repType}
           repExtra={repExtra}
           onToggleRep={toggleRep}
           onToggleMonthTax={toggleMonthTax}
@@ -1452,9 +1452,9 @@ function TaxSection({ companies, taxDone, taxMonth, taxYear, taxFreq, onToggle, 
 }
 
 // ─── КОМПОНЕНТ: ОТЧЁТНОСТЬ ──────────────
-function ReportsSection({ reports, repDone, taxDone, repYear, repQ, repReg, repStatus, repSearch, repExtra, onToggleRep, onToggleMonthTax, onSaveRepExtra, onEditCompany, QLABELS }: {
+function ReportsSection({ reports, repDone, taxDone, repYear, repQ, repReg, repStatus, repSearch, repType, repExtra, onToggleRep, onToggleMonthTax, onSaveRepExtra, onEditCompany, QLABELS }: {
   reports: RepEntry[]; repDone: Record<string, boolean>; taxDone: Record<string, boolean>
-  repYear: number; repQ: string; repReg: string; repStatus: string; repSearch?: string
+  repYear: number; repQ: string; repReg: string; repStatus: string; repSearch?: string; repType?: string
   repExtra: Record<string, { comment: string; cabinet: boolean }>
   onToggleRep: (key: string) => void; onToggleMonthTax: (key: string) => void
   onSaveRepExtra: (key: string, patch: Partial<{ comment: string; cabinet: boolean }>) => void
@@ -1471,6 +1471,7 @@ function ReportsSection({ reports, repDone, taxDone, repYear, repQ, repReg, repS
   const list = reports.filter(r => {
     if (repReg && r.reg !== repReg) return false
     if (repQ && r.q !== repQ) return false
+    if (repType && !r.type.startsWith(repType + '.')) return false
     if (repStatus === 'done' && !repDone[rKey(r)]) return false
     if (repStatus === 'pending' && (repDone[rKey(r)] || repExtra[rKey(r)]?.cabinet)) return false
     if (repStatus === 'ready' && (repDone[rKey(r)] || !repExtra[rKey(r)]?.cabinet)) return false
