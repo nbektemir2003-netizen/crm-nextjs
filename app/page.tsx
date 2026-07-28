@@ -223,6 +223,7 @@ export default function DashboardPage() {
   const [repReg, setRepReg] = useState('')
   const [repStatus, setRepStatus] = useState('')
   const [repSubTab, setRepSubTab] = useState<'tax' | 'stat'>('tax')
+  const [taxPaidFilter, setTaxPaidFilter] = useState<'' | 'paid' | 'unpaid'>('')
   const [repSearch, setRepSearch] = useState('')
 
   // Поиск в уплате налогов
@@ -701,6 +702,11 @@ export default function DashboardPage() {
     count: taxAct.length,
     mainPaid: taxAct.filter(c => taxDone[taxKey(c.n, taxMonth - 1)]).length,
   }
+  const taxActFiltered = taxPaidFilter === 'paid'
+    ? taxAct.filter(c => taxDone[taxKey(c.n, taxMonth - 1)])
+    : taxPaidFilter === 'unpaid'
+    ? taxAct.filter(c => !taxDone[taxKey(c.n, taxMonth - 1)])
+    : taxAct
   const reps = buildReports(companies, repYear, adminSettings)
   const QLABELS = getQLABELS(repYear)
   const repKey = (r: RepEntry) => `${r.co}|${r.type}|${r.q}|${repYear}`
@@ -711,6 +717,7 @@ export default function DashboardPage() {
       if (repStatus === 'done' && !repDone[repKey(r)]) return false
       if (repStatus === 'pending' && (repDone[repKey(r)] || repExtra[repKey(r)]?.cabinet)) return false
       if (repStatus === 'ready' && (repDone[repKey(r)] || !repExtra[repKey(r)]?.cabinet)) return false
+      if (repStatus === 'overdue' && (repDone[repKey(r)] || dl(r.due) >= 0)) return false
       if (repSearch && !r.co.toLowerCase().includes(repSearch.toLowerCase())) return false
       return true
     })
@@ -985,9 +992,15 @@ export default function DashboardPage() {
       {/* ═══════════════ НАЛОГИ ═══════════════ */}
       <div className={`crm-sec${tab === 'tax' ? ' active' : ''}`}>
         <div className="srow">
-          <div className="stat s-indigo"><div className="sl">Компаний</div><div className="sv">{stTax.count}</div></div>
-          <div className="stat s-green"><div className="sl">Уплачено</div><div className="sv green">{stTax.mainPaid}</div></div>
-          <div className="stat s-red"><div className="sl">Не уплачено</div><div className="sv red">{stTax.count - stTax.mainPaid}</div></div>
+          <div className="stat s-indigo" style={{ cursor: 'pointer' }} onClick={() => setTaxPaidFilter('')}>
+            <div className="sl">Компаний</div><div className="sv">{stTax.count}</div>
+          </div>
+          <div className="stat s-green" style={{ cursor: 'pointer', ...(taxPaidFilter === 'paid' ? { outline: '2px solid #16a34a', outlineOffset: -2 } : {}) }} onClick={() => setTaxPaidFilter(f => f === 'paid' ? '' : 'paid')}>
+            <div className="sl">Уплачено {taxPaidFilter === 'paid' ? '▼' : ''}</div><div className="sv green">{stTax.mainPaid}</div>
+          </div>
+          <div className="stat s-red" style={{ cursor: 'pointer', ...(taxPaidFilter === 'unpaid' ? { outline: '2px solid #dc2626', outlineOffset: -2 } : {}) }} onClick={() => setTaxPaidFilter(f => f === 'unpaid' ? '' : 'unpaid')}>
+            <div className="sl">Не уплачено {taxPaidFilter === 'unpaid' ? '▼' : ''}</div><div className="sv red">{stTax.count - stTax.mainPaid}</div>
+          </div>
         </div>
 
         {/* Мини-анализ рисков */}
@@ -1047,23 +1060,37 @@ export default function DashboardPage() {
           </select>
         </div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: '#6b7280' }}>Показано: {taxAct.length} компаний</span>
+          <span style={{ fontSize: 11, color: '#6b7280' }}>Показано: {taxActFiltered.length} компаний{taxPaidFilter ? ` (фильтр: ${taxPaidFilter === 'paid' ? 'уплачено' : 'не уплачено'})` : ''}</span>
           <button className="btn-sm" onClick={markAllTaxPaid} style={{ marginLeft: 'auto' }}>✓ Отметить всех уплачено</button>
           <button className="btn-sm" onClick={resetAllTaxPaid} style={{ background: '#fff', color: '#dc2626', border: '1px solid #fecaca' }}>✕ Сбросить</button>
           <button className="btn-sm" onClick={exportTaxCSV} style={{ background: '#fff', color: '#6366f1', border: '1px solid #c7d2fe' }}>⬇ Excel</button>
         </div>
-        <TaxSection companies={taxAct} taxDone={taxDone} taxMonth={taxMonth} taxYear={taxYear} taxFreq={taxFreq} onToggle={toggleTax} taxComments={taxComments} onComment={saveTaxComment} />
+        <TaxSection companies={taxActFiltered} taxDone={taxDone} taxMonth={taxMonth} taxYear={taxYear} taxFreq={taxFreq} onToggle={toggleTax} taxComments={taxComments} onComment={saveTaxComment} />
       </div>
 
       {/* ═══════════════ ОТЧЁТНОСТЬ ═══════════════ */}
       <div className={`crm-sec${tab === 'rep' ? ' active' : ''}`}>
         <div className="srow">
-          <div className="stat s-indigo"><div className="sl">Нал. всего</div><div className="sv">{stRep.taxTotal}</div></div>
-          <div className="stat s-green"><div className="sl">Нал. сдано</div><div className="sv green">{stRep.taxDone}</div></div>
-          <div className="stat s-red"><div className="sl">Нал. не сдано</div><div className="sv red">{stRep.taxTotal - stRep.taxDone}</div></div>
-          <div className="stat s-purple"><div className="sl">Стат. всего</div><div className="sv">{stRep.statTotal}</div></div>
-          <div className="stat s-green"><div className="sl">Стат. сдано</div><div className="sv green">{stRep.statDone}</div></div>
-          <div className="stat s-red"><div className="sl">Просрочено</div><div className="sv red">{stRep.overdue}</div></div>
+          {repSubTab === 'tax' ? (<>
+            <div className="stat s-indigo"><div className="sl">Нал. всего</div><div className="sv">{stRep.taxTotal}</div></div>
+            <div className="stat s-green" style={{ cursor: 'pointer', ...(repStatus === 'done' ? { outline: '2px solid #16a34a', outlineOffset: -2 } : {}) }} onClick={() => setRepStatus(s => s === 'done' ? '' : 'done')}>
+              <div className="sl">Нал. сдано {repStatus === 'done' ? '▼' : ''}</div><div className="sv green">{stRep.taxDone}</div>
+            </div>
+            <div className="stat s-red" style={{ cursor: 'pointer', ...(repStatus === 'pending' ? { outline: '2px solid #dc2626', outlineOffset: -2 } : {}) }} onClick={() => setRepStatus(s => s === 'pending' ? '' : 'pending')}>
+              <div className="sl">Нал. не сдано {repStatus === 'pending' ? '▼' : ''}</div><div className="sv red">{stRep.taxTotal - stRep.taxDone}</div>
+            </div>
+            <div className="stat s-red" style={{ cursor: 'pointer', borderLeft: '3px solid #b91c1c', ...(repStatus === 'overdue' ? { outline: '2px solid #b91c1c', outlineOffset: -2 } : {}) }} onClick={() => setRepStatus(s => s === 'overdue' ? '' : 'overdue')}>
+              <div className="sl">Просрочено {repStatus === 'overdue' ? '▼' : ''}</div><div className="sv red">{stRep.overdue}</div>
+            </div>
+          </>) : (<>
+            <div className="stat s-purple"><div className="sl">Стат. всего</div><div className="sv">{stRep.statTotal}</div></div>
+            <div className="stat s-green" style={{ cursor: 'pointer', ...(repStatus === 'done' ? { outline: '2px solid #16a34a', outlineOffset: -2 } : {}) }} onClick={() => setRepStatus(s => s === 'done' ? '' : 'done')}>
+              <div className="sl">Стат. сдано {repStatus === 'done' ? '▼' : ''}</div><div className="sv green">{stRep.statDone}</div>
+            </div>
+            <div className="stat s-red" style={{ cursor: 'pointer', ...(repStatus === 'pending' ? { outline: '2px solid #dc2626', outlineOffset: -2 } : {}) }} onClick={() => setRepStatus(s => s === 'pending' ? '' : 'pending')}>
+              <div className="sl">Стат. не сдано {repStatus === 'pending' ? '▼' : ''}</div><div className="sv red">{stRep.statTotal - stRep.statDone}</div>
+            </div>
+          </>)}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' as const }}>
           <div className="stabs" style={{ marginBottom: 0 }}>
@@ -1090,6 +1117,7 @@ export default function DashboardPage() {
           <select value={repStatus} onChange={e => setRepStatus(e.target.value)}>
             <option value="">Все статусы</option>
             <option value="pending">Не сдан</option><option value="ready">Готов</option><option value="done">Сдан</option>
+            <option value="overdue">Просрочено</option>
             <option value="no-reports">Без отчёта</option>
           </select>
         </div>
@@ -1826,6 +1854,7 @@ function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYe
   onSave: (key: string, patch: Partial<PayEntry>) => void
 }) {
   const [selQ, setSelQ] = useState('2 квартал')
+  const [paidFilter, setPaidFilter] = useState<'' | 'paid' | 'unpaid'>('')
   const active = companies.filter(c => c.status === 'Активная')
   const base = paySubTab === 'nds' ? active.filter(c => c.nds || c.reg === 'ОУР (НДС)') : active
   const list = paySearch ? base.filter(c => c.n.toLowerCase().includes(paySearch.toLowerCase())) : base
@@ -1844,6 +1873,11 @@ function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYe
     if (e?.paid) { paidSum += amt; paidCount++ } else { unpaidCount++ }
   })
   const unpaidSum = totalSum - paidSum
+  const displayList = paidFilter === 'paid'
+    ? list.filter(c => payEntries[`${c.n}|${paySubTab}|${p.q}|${payYear}`]?.paid)
+    : paidFilter === 'unpaid'
+    ? list.filter(c => !payEntries[`${c.n}|${paySubTab}|${p.q}|${payYear}`]?.paid)
+    : list
 
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const dueDate = new Date(p.due); dueDate.setHours(0, 0, 0, 0)
@@ -1878,16 +1912,16 @@ function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYe
 
       {/* ── Мини-аналитика ── */}
       <div className="srow" style={{ marginBottom: 16 }}>
-        <div className="stat s-indigo">
+        <div className="stat s-indigo" style={{ cursor: 'pointer' }} onClick={() => setPaidFilter('')}>
           <div className="sl">Компаний</div>
           <div className="sv">{list.length}</div>
         </div>
-        <div className="stat s-green">
-          <div className="sl">Уплачено</div>
+        <div className="stat s-green" style={{ cursor: 'pointer', ...(paidFilter === 'paid' ? { outline: '2px solid #16a34a', outlineOffset: -2 } : {}) }} onClick={() => setPaidFilter(f => f === 'paid' ? '' : 'paid')}>
+          <div className="sl">Уплачено {paidFilter === 'paid' ? '▼' : ''}</div>
           <div className="sv green">{paidCount}</div>
         </div>
-        <div className="stat s-red">
-          <div className="sl">Не уплачено</div>
+        <div className="stat s-red" style={{ cursor: 'pointer', ...(paidFilter === 'unpaid' ? { outline: '2px solid #dc2626', outlineOffset: -2 } : {}) }} onClick={() => setPaidFilter(f => f === 'unpaid' ? '' : 'unpaid')}>
+          <div className="sl">Не уплачено {paidFilter === 'unpaid' ? '▼' : ''}</div>
           <div className="sv red">{unpaidCount}</div>
         </div>
         <div className="stat" style={{ borderLeft: '3px solid #6366f1' }}>
@@ -1932,7 +1966,7 @@ function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYe
               </tr>
             </thead>
             <tbody>
-              {list.map((c, ci) => {
+              {displayList.map((c, ci) => {
                 const key = `${c.n}|${paySubTab}|${p.q}|${payYear}`
                 const e = payEntries[key] || { amount: '', comment: '', paid: false }
                 return (
