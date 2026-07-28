@@ -555,13 +555,15 @@ export default function DashboardPage() {
     const monthName = MN[taxMonth - 1]
     const data = taxAct.map(c => ({
       'Компания': c.n,
+      'БИН': c.bin || '',
       'Режим': c.reg,
       'Группа': c.freq,
       'Категория': c.cat,
       'Статус налога': taxDone[taxKey(c.n, taxMonth - 1)] ? 'Уплачен' : 'Не уплачен',
+      'Комментарий': taxComments[`${c.n}|${taxYear}-${taxMonth - 1}`] || '',
     }))
     const ws = XLSX.utils.json_to_sheet(data)
-    ws['!cols'] = [{ wch: 40 }, { wch: 16 }, { wch: 18 }, { wch: 20 }, { wch: 16 }]
+    ws['!cols'] = [{ wch: 40 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 20 }, { wch: 16 }, { wch: 30 }]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Налоги')
     XLSX.writeFile(wb, `налоги_${monthName}_${taxYear}.xlsx`)
@@ -569,19 +571,86 @@ export default function DashboardPage() {
   function exportRepCSV() {
     const list = repSubTab === 'tax' ? taxReps : statReps
     const label = repSubTab === 'tax' ? 'Нал. отчёты' : 'Стат. отчёты'
-    const data = list.map(r => ({
-      'Компания': r.co,
-      'Режим': r.reg,
-      'Отчёт': r.type,
-      'Период': r.q,
-      'Срок': r.due,
-      'Статус': repDone[`${r.co}|${r.type}|${r.q}|${repYear}`] ? 'Сдан' : 'Не сдан',
-    }))
+    const data = list.map(r => {
+      const rk = `${r.co}|${r.type}|${r.q}|${repYear}`
+      const ex = repExtra[rk] || { comment: '', cabinet: false }
+      const done = repDone[rk]
+      return {
+        'Компания': r.co,
+        'Режим': r.reg,
+        'Отчёт': r.type,
+        'Период': r.q,
+        'Срок': r.due,
+        'Статус': done ? 'Сдан' : ex.cabinet ? 'Готов' : 'Не сдан',
+        'В кабинете': ex.cabinet ? 'Да' : 'Нет',
+        'Комментарий': ex.comment || '',
+      }
+    })
     const ws = XLSX.utils.json_to_sheet(data)
-    ws['!cols'] = [{ wch: 40 }, { wch: 16 }, { wch: 24 }, { wch: 18 }, { wch: 14 }, { wch: 12 }]
+    ws['!cols'] = [{ wch: 40 }, { wch: 16 }, { wch: 24 }, { wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 30 }]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, label)
     XLSX.writeFile(wb, `отчётность_${label}_${repYear}.xlsx`)
+  }
+  function exportCosCSV() {
+    const data = filteredCos.map(c => ({
+      'Компания': c.n,
+      'БИН': c.bin || '',
+      'Режим': c.reg,
+      'Группа': c.freq,
+      'Категория': c.cat,
+      '1С база': c.b === 'БАР' ? 'Есть' : 'Нет',
+      'Риск': c.risk,
+      'Статус': c.status,
+    }))
+    const ws = XLSX.utils.json_to_sheet(data)
+    ws['!cols'] = [{ wch: 40 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 16 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Компании')
+    XLSX.writeFile(wb, 'компании.xlsx')
+  }
+  function exportTasksCSV() {
+    const data = filteredTasks.map(t => ({
+      'Компания': t.co,
+      'Описание': t.desc,
+      'Сотрудник': t.emp,
+      'Приоритет': t.prio,
+      'Срок': t.date,
+      'Статус': t.st,
+    }))
+    const ws = XLSX.utils.json_to_sheet(data)
+    ws['!cols'] = [{ wch: 36 }, { wch: 50 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 14 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Задачи')
+    XLSX.writeFile(wb, 'задачи.xlsx')
+  }
+  function exportPayCSV() {
+    const periods = getPayPeriods(paySubTab, payYear)
+    const active = companies.filter(c => c.status === 'Активная')
+    const list = paySubTab === 'nds' ? active.filter(c => c.nds || c.reg === 'ОУР (НДС)') : active
+    const rows: Record<string, string>[] = []
+    for (const p of periods) {
+      for (const c of list) {
+        const key = `${c.n}|${paySubTab}|${p.q}|${payYear}`
+        const e = payEntries[key] || { amount: '', comment: '', paid: false }
+        rows.push({
+          'Квартал': p.q,
+          'Срок уплаты': p.due,
+          'Компания': c.n,
+          'БИН': c.bin || '',
+          'Режим': c.reg,
+          'Сумма': e.amount || '0',
+          'Комментарий': e.comment || '',
+          'Статус': e.paid ? 'Уплачен' : 'Не уплачен',
+        })
+      }
+    }
+    const ws = XLSX.utils.json_to_sheet(rows)
+    ws['!cols'] = [{ wch: 14 }, { wch: 14 }, { wch: 40 }, { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 30 }, { wch: 14 }]
+    const wb = XLSX.utils.book_new()
+    const label = paySubTab === 'kpn' ? 'КПН-ИПН' : 'НДС'
+    XLSX.utils.book_append_sheet(wb, ws, label)
+    XLSX.writeFile(wb, `уплата_${label}_${payYear}.xlsx`)
   }
 
   // ─── ПОЛЬЗОВАТЕЛИ ───────────────────────
@@ -733,9 +802,12 @@ export default function DashboardPage() {
             <div className="stat s-amber"><div className="sl">Разовые</div><div className="sv">{stCo.once}</div></div>
             <div className="stat s-red"><div className="sl">На закрытие</div><div className="sv red">{stCo.closing}</div></div>
           </div>
-          <button className="btn" style={{ marginLeft: 12, whiteSpace: 'nowrap', flexShrink: 0 }} onClick={() => setShowAddCo(v => !v)}>
-            <i className="ti ti-plus" style={{ marginRight: 4 }}></i>{showAddCo ? 'Скрыть' : 'Добавить компанию'}
-          </button>
+          <div style={{ display: 'flex', gap: 8, marginLeft: 12, flexShrink: 0 }}>
+            <button className="btn-sm" onClick={exportCosCSV} style={{ background: '#fff', color: '#6366f1', border: '1px solid #c7d2fe', whiteSpace: 'nowrap' }}>⬇ Excel</button>
+            <button className="btn" style={{ whiteSpace: 'nowrap' }} onClick={() => setShowAddCo(v => !v)}>
+              <i className="ti ti-plus" style={{ marginRight: 4 }}></i>{showAddCo ? 'Скрыть' : 'Добавить компанию'}
+            </button>
+          </div>
         </div>
 
         {/* Форма добавления (показывается по кнопке) */}
@@ -854,6 +926,7 @@ export default function DashboardPage() {
             <option value="">Все статусы</option>
             <option>В работе</option><option>Выполнено</option>
           </select>
+          <button className="btn-sm" onClick={exportTasksCSV} style={{ background: '#fff', color: '#6366f1', border: '1px solid #c7d2fe', whiteSpace: 'nowrap' }}>⬇ Excel</button>
         </div>
         <div>
           {filteredTasks.length === 0 ? <div className="empty">Нет задач</div> : filteredTasks.map(t => {
@@ -1068,6 +1141,9 @@ export default function DashboardPage() {
 
       {/* ═══════════════ УПЛАТА НАЛОГОВ ═══════════════ */}
       <div className={`crm-sec${tab === 'pay' ? ' active' : ''}`}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+          <button className="btn-sm" onClick={exportPayCSV} style={{ background: '#fff', color: '#6366f1', border: '1px solid #c7d2fe' }}>⬇ Excel</button>
+        </div>
         <PaySection
           companies={companies}
           payEntries={payEntries}
