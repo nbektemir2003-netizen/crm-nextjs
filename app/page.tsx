@@ -1337,7 +1337,13 @@ export default function DashboardPage() {
                 </label>
               </div>
               <div style={{ flex: 1, padding: '8px 12px', background: editCoData.hasEmployees ? '#f0fdf4' : '#f8fafc', border: `1px solid ${editCoData.hasEmployees ? '#86efac' : '#e2e8f0'}`, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
-                <input type="checkbox" id="edit-co-emp" checked={editCoData.hasEmployees !== false} onChange={e => setEditCoData(p => p ? { ...p, hasEmployees: e.target.checked } : p)} style={{ width: 16, height: 16, accentColor: '#16a34a', cursor: 'pointer' }} />
+                <input type="checkbox" id="edit-co-emp" checked={editCoData.hasEmployees !== false} onChange={e => setEditCoData(p => {
+                  if (!p) return p
+                  const checked = e.target.checked
+                  // При включении — убираем 200 из skipReports, чтобы снять скрытие
+                  const newSkip = checked ? (p.skipReports || []).filter(s => !s.includes('200')) : (p.skipReports || [])
+                  return { ...p, hasEmployees: checked, skipReports: newSkip }
+                })} style={{ width: 16, height: 16, accentColor: '#16a34a', cursor: 'pointer' }} />
                 <label htmlFor="edit-co-emp" style={{ cursor: 'pointer', fontSize: 13, fontWeight: 500, color: editCoData.hasEmployees !== false ? '#15803d' : '#475569' }}>
                   Есть сотрудники {editCoData.hasEmployees !== false ? '→ 200.00' : '— без 200'}
                 </label>
