@@ -5,7 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 const BUCKET = 'appdata'
 const FILE = 'company-reports.json'
 
-type CoReports = { skipReports: string[]; extraReports: string[]; bin?: string }
+type CoReports = { skipReports: string[]; extraReports: string[]; bin?: string; noReports?: boolean }
 
 async function readFile(): Promise<Record<string, CoReports>> {
   const { data, error } = await supabaseAdmin.storage.from(BUCKET).download(FILE)
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await req.json()
   const current = await readFile()
-  current[body.id] = { skipReports: body.skipReports || [], extraReports: body.extraReports || [], bin: body.bin || '' }
+  current[body.id] = { skipReports: body.skipReports || [], extraReports: body.extraReports || [], bin: body.bin || '', noReports: !!body.noReports }
   await writeFile(current)
   return NextResponse.json({ ok: true })
 }

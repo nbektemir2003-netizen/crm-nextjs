@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from 'react'
 import * as XLSX from 'xlsx'
 
 // ─── ТИПЫ ───────────────────────────────
-type Company = { id?: string; n: string; freq: string; reg: string; cat: string; b: string; risk: string; nds: boolean; status: string; skipReports: string[]; extraReports: string[]; bin?: string }
+type Company = { id?: string; n: string; freq: string; reg: string; cat: string; b: string; risk: string; nds: boolean; status: string; skipReports: string[]; extraReports: string[]; bin?: string; noReports?: boolean }
 type Task = { id?: string; co: string; desc: string; emp: string; prio: string; date: string; st: string }
 type TabId = 'co' | 'tasks' | 'tax' | 'rep' | 'pay' | 'admin'
 type PayEntry = { amount: string; comment: string; paid: boolean }
@@ -131,6 +131,7 @@ function buildReports(companies: Company[], year: number, admin: AdminSettings):
   const tax: RepEntry[] = [], stat: RepEntry[] = []
   for (const c of companies) {
     if (c.status !== 'Активная') continue
+    if (c.noReports) continue
     const r = c.reg
     const skip = c.skipReports || []
     const extra = c.extraReports || []
@@ -314,6 +315,7 @@ export default function DashboardPage() {
             skipReports: cr[c.id!]?.skipReports || [],
             extraReports: cr[c.id!]?.extraReports || [],
             bin: cr[c.id!]?.bin || '',
+            noReports: !!cr[c.id!]?.noReports,
           })))
         }
       }
@@ -406,15 +408,16 @@ export default function DashboardPage() {
     if (snapshot.id) {
       const [res] = await Promise.all([
         fetch('/api/companies', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(snapshot) }),
-        fetch('/api/company-reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: snapshot.id, skipReports: snapshot.skipReports || [], extraReports: snapshot.extraReports || [], bin: snapshot.bin || '' }) }),
+        fetch('/api/company-reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: snapshot.id, skipReports: snapshot.skipReports || [], extraReports: snapshot.extraReports || [], bin: snapshot.bin || '', noReports: !!snapshot.noReports }) }),
       ])
       if (res.ok) {
         const updated = await res.json()
         const skip = snapshot.skipReports || []
         const extra = snapshot.extraReports || []
         const bin = snapshot.bin || ''
+        const noReports = !!snapshot.noReports
         setCompanies(prev => prev.map(c => c.id === updated.id
-          ? { ...updated, skipReports: skip, extraReports: extra, bin }
+          ? { ...updated, skipReports: skip, extraReports: extra, bin, noReports }
           : c
         ))
       }
@@ -648,7 +651,7 @@ export default function DashboardPage() {
   const cosWithReports = new Set([...reps.tax.map(r => r.co), ...reps.stat.map(r => r.co)])
   const cosWithoutReports = companies.filter(c =>
     c.status === 'Активная' &&
-    !cosWithReports.has(c.n) &&
+    (c.noReports || !cosWithReports.has(c.n)) &&
     (!repSearch || c.n.toLowerCase().includes(repSearch.toLowerCase()))
   )
   const stRep = {
@@ -1186,7 +1189,14 @@ export default function DashboardPage() {
                 <input type="text" placeholder="Телефон / имя инспектора" value={coTaxContacts[editCoData.id || ''] || ''} onChange={e => saveCoTaxContact(editCoData.id || '', e.target.value)} />
               </div>
             </div>
-            <EditCoReports company={editCoData} onChange={setEditCoData} adminSettings={adminSettings} />
+            <div style={{ margin: '10px 0 4px', padding: '8px 12px', background: editCoData.noReports ? '#fff5f5' : '#f8fafc', border: `1px solid ${editCoData.noReports ? '#fecaca' : '#e2e8f0'}`, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input type="checkbox" id="no-reports-toggle" checked={!!editCoData.noReports} onChange={e => setEditCoData(p => p ? { ...p, noReports: e.target.checked } : p)} style={{ width: 16, height: 16, accentColor: '#ef4444', cursor: 'pointer' }} />
+              <label htmlFor="no-reports-toggle" style={{ cursor: 'pointer', fontSize: 13, fontWeight: 500, color: editCoData.noReports ? '#dc2626' : '#475569' }}>
+                Отчёты не сдаём
+              </label>
+              {editCoData.noReports && <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 4 }}>— компания будет в списке «Без отчёта»</span>}
+            </div>
+            {!editCoData.noReports && <EditCoReports company={editCoData} onChange={setEditCoData} adminSettings={adminSettings} />}
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <button className="btn" onClick={saveCoEdit}>Сохранить</button>
               <button className="btn-warn" onClick={deleteCoFromModal}>Удалить</button>
