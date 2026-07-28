@@ -210,7 +210,7 @@ export default function DashboardPage() {
 
   // Фильтры налогов
   const [taxYear, setTaxYear] = useState(2026)
-  const [taxMonth, setTaxMonth] = useState(7)
+  const [taxMonth, setTaxMonth] = useState(6)
   const [taxFreq, setTaxFreq] = useState('')
   const [taxSearch, setTaxSearch] = useState('')
   const [taxCat, setTaxCat] = useState('')
@@ -219,7 +219,7 @@ export default function DashboardPage() {
 
   // Фильтры отчётов
   const [repYear, setRepYear] = useState(2026)
-  const [repQ, setRepQ] = useState('')
+  const [repQ, setRepQ] = useState('2 квартал')
   const [repReg, setRepReg] = useState('')
   const [repStatus, setRepStatus] = useState('')
   const [repSubTab, setRepSubTab] = useState<'tax' | 'stat'>('tax')
@@ -1825,7 +1825,7 @@ function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYe
   onSearchChange: (s: string) => void
   onSave: (key: string, patch: Partial<PayEntry>) => void
 }) {
-  const [selQ, setSelQ] = useState('1 квартал')
+  const [selQ, setSelQ] = useState('2 квартал')
   const active = companies.filter(c => c.status === 'Активная')
   const base = paySubTab === 'nds' ? active.filter(c => c.nds || c.reg === 'ОУР (НДС)') : active
   const list = paySearch ? base.filter(c => c.n.toLowerCase().includes(paySearch.toLowerCase())) : base
