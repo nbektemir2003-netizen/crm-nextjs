@@ -182,6 +182,8 @@ function buildReports(companies: Company[], year: number, admin: AdminSettings):
       const isStat = repType === 'stat'
       if (period === 'quarterly') {
         for (const qt of QTRS) { (isStat ? stat : tax).push({ co: c.n, reg: r, type: name, q: qt.q, due: qt.due200, months: null }) }
+      } else if (period === 'semi-annual') {
+        for (const qt of QTRS) { if (!qt.has910) continue; (isStat ? stat : tax).push({ co: c.n, reg: r, type: name, q: qt.q, due: qt.due200, months: null }) }
       } else if (period === 'monthly') {
         for (const qt of QTRS) { (isStat ? stat : tax).push({ co: c.n, reg: r, type: name + ' (ежемес.)', q: qt.q, due: qt.due200, months: QM[qt.q] }) }
       } else {
@@ -1692,7 +1694,7 @@ function EditCoReports({ company, onChange, adminSettings }: { company: Company;
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6, marginBottom: 8 }}>
               {extraOwn.map(e => {
                 const parts = e.split('|'); const name = parts[0]; const period = parts[1]; const rtype = parts[2]
-                const periodLabel = period === 'quarterly' ? 'кварт.' : period === 'monthly' ? 'ежемес.' : 'годовой'
+                const periodLabel = period === 'quarterly' ? 'кварт.' : period === 'semi-annual' ? 'Q2+Q4' : period === 'monthly' ? 'ежемес.' : 'годовой'
                 const typeLabel = rtype === 'stat' ? '📊' : '📋'
                 return (
                   <div key={e} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '3px 6px', borderRadius: 5, border: '1px solid #fbbf24', background: '#fffbeb' }}>
