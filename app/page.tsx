@@ -825,15 +825,15 @@ export default function DashboardPage() {
             <div className="fr3">
               <div className="fg"><label>Режим *</label>
                 <input list="reg-list" placeholder="ОУР, УПРОЩЕНКА..." value={newCoReg} onChange={e => setNewCoReg(e.target.value)} />
-                <datalist id="reg-list"><option value="ОУР (НДС)" /><option value="ОУР" /><option value="УПРОЩЕНКА" /><option value="СНР" /><option value="КХ" /></datalist>
+                <datalist id="reg-list">{adminSettings.regimes.map(r => <option key={r} value={r} />)}</datalist>
               </div>
               <div className="fg"><label>Группа *</label>
                 <input list="freq-list" placeholder="Ежедневная..." value={newCoFreq} onChange={e => setNewCoFreq(e.target.value)} />
-                <datalist id="freq-list"><option value="Ежедневная" /><option value="Раз в месяц" /><option value="Квартальная" /><option value="Разовая" /><option value="На закрытие" /></datalist>
+                <datalist id="freq-list">{adminSettings.groups.map(g => <option key={g} value={g} />)}</datalist>
               </div>
               <div className="fg"><label>Категория</label>
                 <input list="cat-list" placeholder="КАФЕШКИ, ИП-ЖОО..." value={newCoCat} onChange={e => setNewCoCat(e.target.value)} />
-                <datalist id="cat-list"><option value="КАФЕШКИ" /><option value="ПЕРЕПРОДАЖА" /><option value="ПРОИЗВОДСТВО" /><option value="СТРОИТЕЛЬСТВО" /><option value="ПРОЧИЕ УСЛУГИ" /><option value="ИП-ЖОО" /><option value="Школы JOO" /><option value="РАЗОВОЕ" /><option value="ПРОЧЕЕ" /></datalist>
+                <datalist id="cat-list">{adminSettings.categories.map(c => <option key={c} value={c} />)}</datalist>
               </div>
             </div>
             <div className="fr">
@@ -841,11 +841,11 @@ export default function DashboardPage() {
                 <select value={newCoBase} onChange={e => setNewCoBase(e.target.value)}><option value="БАР">ЕСТЬ</option><option value="ЖОҚ">НЕТ</option></select>
               </div>
               <div className="fg"><label>Риск</label>
-                <select value={newCoRisk} onChange={e => setNewCoRisk(e.target.value)}><option>низкая</option><option>средняя</option><option>высокая</option></select>
+                <select value={newCoRisk} onChange={e => setNewCoRisk(e.target.value)}>{adminSettings.risks.map(r => <option key={r}>{r}</option>)}</select>
               </div>
               <div className="fg"><label>Статус</label>
                 <select value={newCoStatus} onChange={e => setNewCoStatus(e.target.value)}>
-                  <option value="Активная">Активная</option><option value="Приостановлена">Приостановлена</option><option value="На закрытие">На закрытие</option><option value="Закрыто">Закрыто</option>
+                  {adminSettings.statuses.map(s => <option key={s}>{s}</option>)}
                 </select>
               </div>
             </div>
@@ -864,15 +864,15 @@ export default function DashboardPage() {
           <input type="text" placeholder="Поиск компании..." value={coQ} onChange={e => setCoQ(e.target.value)} />
           <select value={coFreq} onChange={e => setCoFreq(e.target.value)}>
             <option value="">Все группы</option>
-            <option>Ежедневная</option><option>Раз в месяц</option><option>Квартальная</option><option>Разовая</option><option>На закрытие</option>
+            {adminSettings.groups.map(g => <option key={g}>{g}</option>)}
           </select>
           <select value={coCat} onChange={e => setCoCat(e.target.value)}>
             <option value="">Все категории</option>
-            <option>КАФЕШКИ</option><option>ПЕРЕПРОДАЖА</option><option>ПРОИЗВОДСТВО</option><option>СТРОИТЕЛЬСТВО</option><option>ПРОЧИЕ УСЛУГИ</option><option>ИП-ЖОО</option><option>Школы JOO</option><option>РАЗОВОЕ</option><option>ПРОЧЕЕ</option>
+            {adminSettings.categories.map(c => <option key={c}>{c}</option>)}
           </select>
           <select value={coReg} onChange={e => setCoReg(e.target.value)}>
             <option value="">Все режимы</option>
-            <option value="НДС">НДС</option><option value="УПРОЩЕНКА">Упрощёнка</option><option value="ОУР">ОУР</option>
+            {adminSettings.regimes.map(r => <option key={r}>{r}</option>)}
           </select>
         </div>
         <div className="tw">
@@ -1039,11 +1039,11 @@ export default function DashboardPage() {
           </select>
           <select value={taxCat} onChange={e => setTaxCat(e.target.value)}>
             <option value="">Все категории</option>
-            <option>КАФЕШКИ</option><option>ПЕРЕПРОДАЖА</option><option>ПРОИЗВОДСТВО</option><option>СТРОИТЕЛЬСТВО</option><option>ПРОЧИЕ УСЛУГИ</option><option>ИП-ЖОО</option><option>Школы JOO</option><option>РАЗОВОЕ</option><option>ПРОЧЕЕ</option>
+            {adminSettings.categories.map(c => <option key={c}>{c}</option>)}
           </select>
           <select value={taxReg} onChange={e => setTaxReg(e.target.value)}>
             <option value="">Все режимы</option>
-            <option value="НДС">ОУР (НДС)</option><option value="ОУР">ОУР</option><option value="УПРОЩЕНКА">Упрощёнка</option><option value="СНР">СНР</option><option value="КХ">КХ</option>
+            {adminSettings.regimes.map(r => <option key={r}>{r}</option>)}
           </select>
         </div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
@@ -1085,7 +1085,7 @@ export default function DashboardPage() {
           </select>
           <select value={repReg} onChange={e => setRepReg(e.target.value)}>
             <option value="">Все режимы</option>
-            <option value="ОУР (НДС)">ОУР с НДС</option><option value="ОУР">ОУР без НДС</option><option value="УПРОЩЕНКА">Упрощёнка</option><option value="КХ">КХ</option>
+            {adminSettings.regimes.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
           <select value={repStatus} onChange={e => setRepStatus(e.target.value)}>
             <option value="">Все статусы</option>
@@ -1226,17 +1226,17 @@ export default function DashboardPage() {
             <div className="fr">
               <div className="fg"><label>Режим</label>
                 <input list="e-reg-list" value={editCoData.reg} onChange={e => setEditCoData(p => p ? { ...p, reg: e.target.value } : p)} />
-                <datalist id="e-reg-list"><option value="ОУР (НДС)" /><option value="ОУР" /><option value="УПРОЩЕНКА" /><option value="СНР" /><option value="КХ" /></datalist>
+                <datalist id="e-reg-list">{adminSettings.regimes.map(r => <option key={r} value={r} />)}</datalist>
               </div>
               <div className="fg"><label>Группа</label>
                 <input list="e-freq-list" value={editCoData.freq} onChange={e => setEditCoData(p => p ? { ...p, freq: e.target.value } : p)} />
-                <datalist id="e-freq-list"><option value="Ежедневная" /><option value="Раз в месяц" /><option value="Квартальная" /><option value="Разовая" /><option value="На закрытие" /></datalist>
+                <datalist id="e-freq-list">{adminSettings.groups.map(g => <option key={g} value={g} />)}</datalist>
               </div>
             </div>
             <div className="fr">
               <div className="fg"><label>Категория</label>
                 <input list="e-cat-list" value={editCoData.cat} onChange={e => setEditCoData(p => p ? { ...p, cat: e.target.value } : p)} />
-                <datalist id="e-cat-list"><option value="КАФЕШКИ" /><option value="ПЕРЕПРОДАЖА" /><option value="ПРОИЗВОДСТВО" /><option value="СТРОИТЕЛЬСТВО" /><option value="ПРОЧИЕ УСЛУГИ" /><option value="ИП-ЖОО" /><option value="Школы JOO" /><option value="РАЗОВОЕ" /><option value="ПРОЧЕЕ" /></datalist>
+                <datalist id="e-cat-list">{adminSettings.categories.map(c => <option key={c} value={c} />)}</datalist>
               </div>
               <div className="fg"><label>1С база</label>
                 <select value={editCoData.b} onChange={e => setEditCoData(p => p ? { ...p, b: e.target.value } : p)}>
@@ -1247,12 +1247,12 @@ export default function DashboardPage() {
             <div className="fr">
               <div className="fg"><label>Риск</label>
                 <select value={editCoData.risk} onChange={e => setEditCoData(p => p ? { ...p, risk: e.target.value } : p)}>
-                  <option value="низкая">Низкая</option><option value="средняя">Средняя</option><option value="высокая">Высокая</option>
+                  {adminSettings.risks.map(r => <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
                 </select>
               </div>
               <div className="fg"><label>Статус</label>
                 <select value={editCoData.status} onChange={e => setEditCoData(p => p ? { ...p, status: e.target.value } : p)}>
-                  <option value="Активная">Активная</option><option value="Приостановлена">Приостановлена</option><option value="На закрытие">На закрытие</option><option value="Закрыто">Закрыто</option>
+                  {adminSettings.statuses.map(s => <option key={s}>{s}</option>)}
                 </select>
               </div>
             </div>
