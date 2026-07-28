@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from 'react'
 import * as XLSX from 'xlsx'
 
 // ─── ТИПЫ ───────────────────────────────
-type Company = { id?: string; n: string; freq: string; reg: string; cat: string; b: string; risk: string; nds: boolean; status: string; skipReports: string[]; extraReports: string[]; bin?: string; noReports?: boolean }
+type Company = { id?: string; n: string; freq: string; reg: string; cat: string; b: string; risk: string; nds: boolean; status: string; skipReports: string[]; extraReports: string[]; bin?: string; noReports?: boolean; hasEmployees?: boolean }
 type Task = { id?: string; co: string; desc: string; emp: string; prio: string; date: string; st: string }
 type TabId = 'co' | 'tasks' | 'tax' | 'rep' | 'pay' | 'admin'
 type PayEntry = { amount: string; comment: string; paid: boolean }
@@ -138,6 +138,8 @@ function buildReports(companies: Company[], year: number, admin: AdminSettings):
     const has200skipped = skip.some(s => s.includes('200'))
     for (const rep of (admin.taxReports[r] || [])) {
       if (skip.includes(rep.code)) continue
+      // Отчёт 200 — только если у компании есть сотрудники (или поле не задано — backward compat)
+      if (rep.code.includes('200') && c.hasEmployees === false) continue
       if (rep.period === 'annual') {
         tax.push({ co: c.n, reg: r, type: rep.code, q: 'Годовой', due: `${ny}-03-31`, months: null })
       } else {
@@ -262,6 +264,7 @@ export default function DashboardPage() {
   const [newCoBase, setNewCoBase] = useState('БАР')
   const [newCoRisk, setNewCoRisk] = useState('низкая')
   const [newCoNds, setNewCoNds] = useState(false)
+  const [newCoHasEmployees, setNewCoHasEmployees] = useState(false)
   const [newCoStatus, setNewCoStatus] = useState('Активная')
   const [addMsg, setAddMsg] = useState('')
 
@@ -324,6 +327,7 @@ export default function DashboardPage() {
             extraReports: cr[c.id!]?.extraReports || [],
             bin: cr[c.id!]?.bin || '',
             noReports: !!cr[c.id!]?.noReports,
+            hasEmployees: cr[c.id!]?.hasEmployees,
           })))
         }
       }
@@ -416,7 +420,7 @@ export default function DashboardPage() {
     if (snapshot.id) {
       const [res] = await Promise.all([
         fetch('/api/companies', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(snapshot) }),
-        fetch('/api/company-reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: snapshot.id, skipReports: snapshot.skipReports || [], extraReports: snapshot.extraReports || [], bin: snapshot.bin || '', noReports: !!snapshot.noReports }) }),
+        fetch('/api/company-reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: snapshot.id, skipReports: snapshot.skipReports || [], extraReports: snapshot.extraReports || [], bin: snapshot.bin || '', noReports: !!snapshot.noReports, hasEmployees: snapshot.hasEmployees }) }),
       ])
       if (res.ok) {
         const updated = await res.json()
@@ -424,8 +428,9 @@ export default function DashboardPage() {
         const extra = snapshot.extraReports || []
         const bin = snapshot.bin || ''
         const noReports = !!snapshot.noReports
+        const hasEmployees = snapshot.hasEmployees
         setCompanies(prev => prev.map(c => c.id === updated.id
-          ? { ...updated, skipReports: skip, extraReports: extra, bin, noReports }
+          ? { ...updated, skipReports: skip, extraReports: extra, bin, noReports, hasEmployees }
           : c
         ))
       }
@@ -468,10 +473,14 @@ export default function DashboardPage() {
 
   async function addCo() {
     if (!newCoName || !newCoReg) { alert('Заполни название и режим'); return }
-    const co: Company = { n: newCoName, freq: newCoFreq, reg: newCoReg, cat: newCoCat, b: newCoBase, risk: newCoRisk, nds: newCoNds, status: newCoStatus, skipReports: [], extraReports: [] }
+    const co: Company = { n: newCoName, freq: newCoFreq, reg: newCoReg, cat: newCoCat, b: newCoBase, risk: newCoRisk, nds: newCoNds, status: newCoStatus, skipReports: [], extraReports: [], hasEmployees: newCoHasEmployees }
     setSyncText('Сохранение...'); setSyncCls('syncing')
     const res = await fetch('/api/companies', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(co) })
-    if (res.ok) { const saved = await res.json(); setCompanies(prev => [...prev, saved]) }
+    if (res.ok) {
+      const saved = await res.json()
+      setCompanies(prev => [...prev, { ...saved, hasEmployees: newCoHasEmployees }])
+      if (saved.id) await fetch('/api/company-reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: saved.id, skipReports: [], extraReports: [], bin: newCoBin || '', noReports: false, hasEmployees: newCoHasEmployees }) })
+    }
     setNewCoName('')
     setAddMsg(`✓ "${newCoName}" добавлена! Отчёты созданы по режиму ${newCoReg}.`)
     setTimeout(() => setAddMsg(''), 4000)
@@ -867,11 +876,19 @@ export default function DashboardPage() {
                 </select>
               </div>
             </div>
-            <div style={{ margin: '6px 0 10px', padding: '8px 12px', background: newCoNds ? '#eff6ff' : '#f8fafc', border: `1px solid ${newCoNds ? '#bfdbfe' : '#e2e8f0'}`, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
-              <input type="checkbox" id="new-co-nds" checked={newCoNds} onChange={e => setNewCoNds(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#4f46e5', cursor: 'pointer' }} />
-              <label htmlFor="new-co-nds" style={{ cursor: 'pointer', fontSize: 13, fontWeight: 500, color: newCoNds ? '#1d4ed8' : '#475569' }}>
-                Плательщик НДС {newCoNds ? '— будет сдавать 300.00 (НДС) ежеквартально' : ''}
-              </label>
+            <div style={{ display: 'flex', gap: 8, margin: '6px 0 10px' }}>
+              <div style={{ flex: 1, padding: '8px 12px', background: newCoNds ? '#eff6ff' : '#f8fafc', border: `1px solid ${newCoNds ? '#bfdbfe' : '#e2e8f0'}`, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input type="checkbox" id="new-co-nds" checked={newCoNds} onChange={e => setNewCoNds(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#4f46e5', cursor: 'pointer' }} />
+                <label htmlFor="new-co-nds" style={{ cursor: 'pointer', fontSize: 13, fontWeight: 500, color: newCoNds ? '#1d4ed8' : '#475569' }}>
+                  Плательщик НДС {newCoNds ? '→ 300.00 (кварт.)' : ''}
+                </label>
+              </div>
+              <div style={{ flex: 1, padding: '8px 12px', background: newCoHasEmployees ? '#f0fdf4' : '#f8fafc', border: `1px solid ${newCoHasEmployees ? '#86efac' : '#e2e8f0'}`, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input type="checkbox" id="new-co-emp" checked={newCoHasEmployees} onChange={e => setNewCoHasEmployees(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#16a34a', cursor: 'pointer' }} />
+                <label htmlFor="new-co-emp" style={{ cursor: 'pointer', fontSize: 13, fontWeight: 500, color: newCoHasEmployees ? '#15803d' : '#475569' }}>
+                  Есть сотрудники {newCoHasEmployees ? '→ 200.00 (кварт.)' : ''}
+                </label>
+              </div>
             </div>
             <div className="ibox" style={{ marginBottom: 10 }}>
               {newCoReg ? (({ 'ОУР': '200.00 (кварт.) · 100.00 (год.)', 'УПРОЩЕНКА': '910.00 (2 и 4 кв.) · 200.00 (кварт.)', 'СНР': '910.00 (2 и 4 кв.) · 200.00 (кварт.)', 'КХ': '920.00 (год.)' }[newCoReg] || newCoReg) + (newCoNds ? ' · 300.00 НДС (кварт.)' : '')) : 'Выберите режим — отчёты создадутся автоматически'}
@@ -1305,11 +1322,19 @@ export default function DashboardPage() {
                 </select>
               </div>
             </div>
-            <div style={{ margin: '6px 0 8px', padding: '8px 12px', background: editCoData.nds ? '#eff6ff' : '#f8fafc', border: `1px solid ${editCoData.nds ? '#bfdbfe' : '#e2e8f0'}`, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
-              <input type="checkbox" id="edit-co-nds" checked={!!editCoData.nds} onChange={e => setEditCoData(p => p ? { ...p, nds: e.target.checked } : p)} style={{ width: 16, height: 16, accentColor: '#4f46e5', cursor: 'pointer' }} />
-              <label htmlFor="edit-co-nds" style={{ cursor: 'pointer', fontSize: 13, fontWeight: 500, color: editCoData.nds ? '#1d4ed8' : '#475569' }}>
-                Плательщик НДС {editCoData.nds ? '— сдаёт 300.00 (НДС) ежеквартально' : ''}
-              </label>
+            <div style={{ display: 'flex', gap: 8, margin: '6px 0 8px' }}>
+              <div style={{ flex: 1, padding: '8px 12px', background: editCoData.nds ? '#eff6ff' : '#f8fafc', border: `1px solid ${editCoData.nds ? '#bfdbfe' : '#e2e8f0'}`, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input type="checkbox" id="edit-co-nds" checked={!!editCoData.nds} onChange={e => setEditCoData(p => p ? { ...p, nds: e.target.checked } : p)} style={{ width: 16, height: 16, accentColor: '#4f46e5', cursor: 'pointer' }} />
+                <label htmlFor="edit-co-nds" style={{ cursor: 'pointer', fontSize: 13, fontWeight: 500, color: editCoData.nds ? '#1d4ed8' : '#475569' }}>
+                  Плательщик НДС {editCoData.nds ? '→ 300.00' : ''}
+                </label>
+              </div>
+              <div style={{ flex: 1, padding: '8px 12px', background: editCoData.hasEmployees ? '#f0fdf4' : '#f8fafc', border: `1px solid ${editCoData.hasEmployees ? '#86efac' : '#e2e8f0'}`, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input type="checkbox" id="edit-co-emp" checked={editCoData.hasEmployees !== false} onChange={e => setEditCoData(p => p ? { ...p, hasEmployees: e.target.checked } : p)} style={{ width: 16, height: 16, accentColor: '#16a34a', cursor: 'pointer' }} />
+                <label htmlFor="edit-co-emp" style={{ cursor: 'pointer', fontSize: 13, fontWeight: 500, color: editCoData.hasEmployees !== false ? '#15803d' : '#475569' }}>
+                  Есть сотрудники {editCoData.hasEmployees !== false ? '→ 200.00' : '— без 200'}
+                </label>
+              </div>
             </div>
             <div className="fr">
               <div className="fg"><label>📞 Телефон директора</label>
