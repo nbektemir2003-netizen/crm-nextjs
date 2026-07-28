@@ -9,7 +9,7 @@ type Company = { id?: string; n: string; freq: string; reg: string; cat: string;
 type Task = { id?: string; co: string; desc: string; emp: string; prio: string; date: string; st: string }
 type TabId = 'co' | 'tasks' | 'tax' | 'rep' | 'pay' | 'admin'
 type PayEntry = { amount: string; comment: string; paid: boolean }
-type AdminReportItem = { code: string; period: 'quarterly' | 'annual' | 'monthly'; hasMonths: boolean; onlyEvenQ?: boolean }
+type AdminReportItem = { code: string; period: 'quarterly' | 'annual' | 'monthly' | 'semi-annual'; hasMonths: boolean; onlyEvenQ?: boolean }
 type AdminSettings = {
   regimes: string[]; categories: string[]; groups: string[]; bases: string[]; statuses: string[]; risks: string[]
   taxReports: Record<string, AdminReportItem[]>; statReports: Record<string, AdminReportItem[]>
@@ -144,7 +144,7 @@ function buildReports(companies: Company[], year: number, admin: AdminSettings):
         tax.push({ co: c.n, reg: r, type: rep.code, q: 'Годовой', due: `${ny}-03-31`, months: null })
       } else {
         for (const qt of QTRS) {
-          if (rep.onlyEvenQ && !qt.has910) continue
+          if ((rep.onlyEvenQ || rep.period === 'semi-annual') && !qt.has910) continue
           const showMonths = rep.hasMonths || (rep.code.includes('910') && has200skipped)
           tax.push({ co: c.n, reg: r, type: rep.code, q: qt.q, due: qt.due200, months: showMonths ? QM[qt.q] : null })
         }
@@ -163,6 +163,11 @@ function buildReports(companies: Company[], year: number, admin: AdminSettings):
       } else if (rep.period === 'monthly') {
         for (const qt of QTRS) {
           stat.push({ co: c.n, reg: r, type: rep.code + ' (ежемес.)', q: qt.q, due: qt.due200, months: QM[qt.q] })
+        }
+      } else if (rep.period === 'semi-annual') {
+        for (const qt of QTRS) {
+          if (!qt.has910) continue
+          stat.push({ co: c.n, reg: r, type: rep.code, q: qt.q, due: qt.due200, months: null })
         }
       } else {
         for (const qt of QTRS) {
@@ -1713,6 +1718,7 @@ function EditCoReports({ company, onChange, adminSettings }: { company: Company;
             />
             <select value={newRepPeriod} onChange={e => setNewRepPeriod(e.target.value)} style={{ fontSize: 11, padding: '3px 6px', border: '1px solid #d3d1c7', borderRadius: 5 }}>
               <option value="quarterly">Каждый квартал</option>
+              <option value="semi-annual">Полугодовой (Q2+Q4)</option>
               <option value="monthly">Ежемесячно</option>
               <option value="annual">Годовой</option>
             </select>
@@ -1771,7 +1777,7 @@ function AdminSection({ adminSettings, onSave }: { adminSettings: AdminSettings;
   function addReport(regime: string) {
     const inp = getInp(regime)
     if (!inp.code.trim()) return
-    const item: AdminReportItem = { code: inp.code.trim(), period: inp.period as 'quarterly' | 'annual', hasMonths: inp.hasMonths, onlyEvenQ: inp.onlyEvenQ }
+    const item: AdminReportItem = { code: inp.code.trim(), period: inp.period as 'quarterly' | 'annual' | 'monthly' | 'semi-annual', hasMonths: inp.hasMonths, onlyEvenQ: inp.onlyEvenQ }
     const existing = repField[regime] || []
     if (existing.some(r => r.code === item.code)) return
     const field = isStatTab ? 'statReports' : 'taxReports'
@@ -1838,7 +1844,7 @@ function AdminSection({ adminSettings, onSave }: { adminSettings: AdminSettings;
                     {reps.map(rep => (
                       <div key={rep.code} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', background: '#f9fafb', borderRadius: 7, fontSize: 11 }}>
                         <span style={{ flex: 1, color: '#111827', fontWeight: 500 }}>{rep.code}</span>
-                        <span style={{ color: '#94a3b8', fontSize: 10, whiteSpace: 'nowrap' as const }}>{rep.period === 'annual' ? 'год.' : rep.period === 'monthly' ? 'ежемес.' : rep.onlyEvenQ ? 'Q2+Q4' : 'кварт.'}</span>
+                        <span style={{ color: '#94a3b8', fontSize: 10, whiteSpace: 'nowrap' as const }}>{rep.period === 'annual' ? 'год.' : rep.period === 'monthly' ? 'ежемес.' : (rep.period === 'semi-annual' || rep.onlyEvenQ) ? 'Q2+Q4' : 'кварт.'}</span>
                         {rep.hasMonths && <span style={{ fontSize: 9, background: '#ede9fe', color: '#6d28d9', borderRadius: 4, padding: '1px 5px' }}>мес.</span>}
                         <button onClick={() => deleteReport(regime, rep.code)} style={{ background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px' }}>✕</button>
                       </div>
@@ -1853,6 +1859,7 @@ function AdminSection({ adminSettings, onSave }: { adminSettings: AdminSettings;
                     <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' as const, alignItems: 'center' }}>
                       <select value={inp.period} onChange={e => setInp(regime, { period: e.target.value })} style={{ fontSize: 11, padding: '4px 7px', border: '1px solid #e5e7eb', borderRadius: 5 }}>
                         <option value="quarterly">Квартально</option>
+                        <option value="semi-annual">Полугодовой (Q2+Q4)</option>
                         <option value="monthly">Ежемесячно</option>
                         <option value="annual">Годовой</option>
                       </select>
