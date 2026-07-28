@@ -1947,7 +1947,7 @@ function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYe
                         value={e.amount}
                         onChange={ev => onSave(key, { amount: ev.target.value })}
                         placeholder="0"
-                        style={{ width: 110, fontSize: 12, padding: '5px 8px', border: '1px solid #e5e7eb', borderRadius: 6, textAlign: 'right' as const, outline: 'none', background: e.paid ? '#dcfce7' : '#fff' }}
+                        style={{ width: 120, fontSize: 13, fontWeight: 600, padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: 6, textAlign: 'right' as const, outline: 'none', background: '#fff', color: '#111827' }}
                       />
                     </td>
                     <td style={{ padding: '4px 10px' }}>
@@ -1956,7 +1956,7 @@ function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYe
                         value={e.comment}
                         onChange={ev => onSave(key, { comment: ev.target.value })}
                         placeholder="Заметка..."
-                        style={{ width: '100%', minWidth: 120, fontSize: 11, padding: '5px 8px', border: '1px solid #e5e7eb', borderRadius: 6, outline: 'none', color: '#6b7280' }}
+                        style={{ width: '100%', minWidth: 160, fontSize: 12, padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: 6, outline: 'none', background: '#fff', color: '#111827' }}
                       />
                     </td>
                     <td style={{ padding: '4px 10px', textAlign: 'center' as const }}>
