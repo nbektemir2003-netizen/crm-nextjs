@@ -719,8 +719,7 @@ export default function DashboardPage() {
   const statReps = applyRepFilters(reps.stat)
   const cosWithReports = new Set([...reps.tax.map(r => r.co), ...reps.stat.map(r => r.co)])
   const cosWithoutReports = companies.filter(c =>
-    c.status === 'Активная' &&
-    (c.noReports || !cosWithReports.has(c.n)) &&
+    (c.noReports || (c.status === 'Активная' && !cosWithReports.has(c.n))) &&
     (!repSearch || c.n.toLowerCase().includes(repSearch.toLowerCase()))
   )
   const stRep = {
