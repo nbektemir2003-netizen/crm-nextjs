@@ -228,6 +228,7 @@ export default function DashboardPage() {
   const [repQ, setRepQ] = useState('2 квартал')
   const [repReg, setRepReg] = useState('')
   const [repStatus, setRepStatus] = useState('')
+  const [repType, setRepType] = useState('')
   const [repSubTab, setRepSubTab] = useState<'tax' | 'stat'>('tax')
   const [taxPaidFilter, setTaxPaidFilter] = useState<'' | 'paid' | 'unpaid'>('')
   const [repSearch, setRepSearch] = useState('')
@@ -720,6 +721,7 @@ export default function DashboardPage() {
     return list.filter(r => {
       if (repQ && r.q !== repQ) return false
       if (repReg && r.reg !== repReg) return false
+      if (repType && !r.type.startsWith(repType + '.')) return false
       if (repStatus === 'done' && !repDone[repKey(r)]) return false
       if (repStatus === 'pending' && (repDone[repKey(r)] || repExtra[repKey(r)]?.cabinet)) return false
       if (repStatus === 'ready' && (repDone[repKey(r)] || !repExtra[repKey(r)]?.cabinet)) return false
@@ -728,6 +730,9 @@ export default function DashboardPage() {
       return true
     })
   }
+  const repTypeCodes = repSubTab === 'tax'
+    ? [...new Set(reps.tax.map(r => r.type.split('.')[0]))].sort()
+    : [...new Set(reps.stat.map(r => r.type.split('.')[0]))].sort()
   const taxReps = applyRepFilters(reps.tax)
   const statReps = applyRepFilters(reps.stat)
   const cosWithReports = new Set([...reps.tax.map(r => r.co), ...reps.stat.map(r => r.co)])
@@ -1106,8 +1111,8 @@ export default function DashboardPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' as const }}>
           <div className="stabs" style={{ marginBottom: 0 }}>
-            <button className={`stab${repSubTab === 'tax' ? ' active' : ''}`} onClick={() => setRepSubTab('tax')}>Налоговые отчёты</button>
-            <button className={`stab${repSubTab === 'stat' ? ' active' : ''}`} onClick={() => setRepSubTab('stat')}>Статистические отчёты</button>
+            <button className={`stab${repSubTab === 'tax' ? ' active' : ''}`} onClick={() => { setRepSubTab('tax'); setRepType('') }}>Налоговые отчёты</button>
+            <button className={`stab${repSubTab === 'stat' ? ' active' : ''}`} onClick={() => { setRepSubTab('stat'); setRepType('') }}>Статистические отчёты</button>
           </div>
           <select value={repYear} onChange={e => setRepYear(+e.target.value)} style={{ fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#111827' }}>
             <option value={2025}>2025 год</option>
@@ -1125,6 +1130,10 @@ export default function DashboardPage() {
           <select value={repReg} onChange={e => setRepReg(e.target.value)}>
             <option value="">Все режимы</option>
             {adminSettings.regimes.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+          <select value={repType} onChange={e => setRepType(e.target.value)}>
+            <option value="">Все отчёты</option>
+            {repTypeCodes.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
           <select value={repStatus} onChange={e => setRepStatus(e.target.value)}>
             <option value="">Все статусы</option>
