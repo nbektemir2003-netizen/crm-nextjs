@@ -41,7 +41,7 @@ function getQLABELS(y: number): Record<string, string> {
 const QORDER = ['1 квартал', '2 квартал', '3 квартал', '4 квартал', 'Годовой']
 const DEFAULT_USERS = ['Нурдаулет', 'Акмарал', 'Динара', 'Жания', 'Ұлбосын', 'Айзат']
 const DEFAULT_ADMIN: AdminSettings = {
-  regimes: ['ОУР (НДС)', 'ОУР', 'УПРОЩЕНКА', 'СНР', 'КХ'],
+  regimes: ['ОУР', 'УПРОЩЕНКА', 'СНР', 'КХ'],
   categories: ['КАФЕШКИ', 'ПЕРЕПРОДАЖА', 'ПРОИЗВОДСТВО', 'СТРОИТЕЛЬСТВО', 'ПРОЧИЕ УСЛУГИ', 'ИП-ЖОО', 'Школы JOO', 'РАЗОВОЕ', 'ПРОЧЕЕ'],
   groups: ['Ежедневная', 'Раз в месяц', 'Квартальная', 'Разовая', 'На закрытие'],
   bases: ['БАР', 'ЖОҚ'],
@@ -146,6 +146,12 @@ function buildReports(companies: Company[], year: number, admin: AdminSettings):
           const showMonths = rep.hasMonths || (rep.code.includes('910') && has200skipped)
           tax.push({ co: c.n, reg: r, type: rep.code, q: qt.q, due: qt.due200, months: showMonths ? QM[qt.q] : null })
         }
+      }
+    }
+    // Если у компании стоит НДС и режим не ОУР(НДС) — добавляем 300.00 квартально
+    if (c.nds && r !== 'ОУР (НДС)' && !skip.includes('300.00 (НДС)')) {
+      for (const qt of QTRS) {
+        tax.push({ co: c.n, reg: r, type: '300.00 (НДС)', q: qt.q, due: qt.due300, months: null })
       }
     }
     for (const rep of (admin.statReports[r] || [])) {
@@ -254,7 +260,7 @@ export default function DashboardPage() {
   const [newCoCat, setNewCoCat] = useState('')
   const [newCoBase, setNewCoBase] = useState('БАР')
   const [newCoRisk, setNewCoRisk] = useState('низкая')
-  const [newCoNds, setNewCoNds] = useState('нет')
+  const [newCoNds, setNewCoNds] = useState(false)
   const [newCoStatus, setNewCoStatus] = useState('Активная')
   const [addMsg, setAddMsg] = useState('')
 
@@ -461,7 +467,7 @@ export default function DashboardPage() {
 
   async function addCo() {
     if (!newCoName || !newCoReg) { alert('Заполни название и режим'); return }
-    const co: Company = { n: newCoName, freq: newCoFreq, reg: newCoReg, cat: newCoCat, b: newCoBase, risk: newCoRisk, nds: newCoNds === 'да', status: newCoStatus, skipReports: [], extraReports: [] }
+    const co: Company = { n: newCoName, freq: newCoFreq, reg: newCoReg, cat: newCoCat, b: newCoBase, risk: newCoRisk, nds: newCoNds, status: newCoStatus, skipReports: [], extraReports: [] }
     setSyncText('Сохранение...'); setSyncCls('syncing')
     const res = await fetch('/api/companies', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(co) })
     if (res.ok) { const saved = await res.json(); setCompanies(prev => [...prev, saved]) }
@@ -628,7 +634,7 @@ export default function DashboardPage() {
   function exportPayCSV() {
     const periods = getPayPeriods(paySubTab, payYear)
     const active = companies.filter(c => c.status === 'Активная')
-    const list = paySubTab === 'nds' ? active.filter(c => c.nds || c.reg === 'ОУР (НДС)') : active
+    const list = paySubTab === 'nds' ? active.filter(c => c.nds || c.reg === 'ОУР (НДС)' || c.reg.includes('НДС')) : active
     const rows: Record<string, string>[] = []
     for (const p of periods) {
       for (const c of list) {
@@ -856,8 +862,14 @@ export default function DashboardPage() {
                 </select>
               </div>
             </div>
+            <div style={{ margin: '6px 0 10px', padding: '8px 12px', background: newCoNds ? '#eff6ff' : '#f8fafc', border: `1px solid ${newCoNds ? '#bfdbfe' : '#e2e8f0'}`, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input type="checkbox" id="new-co-nds" checked={newCoNds} onChange={e => setNewCoNds(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#4f46e5', cursor: 'pointer' }} />
+              <label htmlFor="new-co-nds" style={{ cursor: 'pointer', fontSize: 13, fontWeight: 500, color: newCoNds ? '#1d4ed8' : '#475569' }}>
+                Плательщик НДС {newCoNds ? '— будет сдавать 300.00 (НДС) ежеквартально' : ''}
+              </label>
+            </div>
             <div className="ibox" style={{ marginBottom: 10 }}>
-              {newCoReg ? ({ 'ОУР (НДС)': '300.00 (кварт.) · 200.00 (кварт.) · 100.00 (год.)', 'ОУР': '200.00 (кварт.) · 100.00 (год.)', 'УПРОЩЕНКА': '910.00 (2 и 4 кв.) · 200.00 (кварт.)', 'СНР': '910.00 (2 и 4 кв.) · 200.00 (кварт.)', 'КХ': '920.00 (год.)' }[newCoReg] || 'Выберите режим') : 'Выберите режим — отчёты создадутся автоматически'}
+              {newCoReg ? (({ 'ОУР': '200.00 (кварт.) · 100.00 (год.)', 'УПРОЩЕНКА': '910.00 (2 и 4 кв.) · 200.00 (кварт.)', 'СНР': '910.00 (2 и 4 кв.) · 200.00 (кварт.)', 'КХ': '920.00 (год.)' }[newCoReg] || newCoReg) + (newCoNds ? ' · 300.00 НДС (кварт.)' : '')) : 'Выберите режим — отчёты создадутся автоматически'}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn" onClick={() => { addCo(); setShowAddCo(false) }}>Добавить</button>
@@ -1283,6 +1295,12 @@ export default function DashboardPage() {
                   {adminSettings.statuses.map(s => <option key={s}>{s}</option>)}
                 </select>
               </div>
+            </div>
+            <div style={{ margin: '6px 0 8px', padding: '8px 12px', background: editCoData.nds ? '#eff6ff' : '#f8fafc', border: `1px solid ${editCoData.nds ? '#bfdbfe' : '#e2e8f0'}`, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input type="checkbox" id="edit-co-nds" checked={!!editCoData.nds} onChange={e => setEditCoData(p => p ? { ...p, nds: e.target.checked } : p)} style={{ width: 16, height: 16, accentColor: '#4f46e5', cursor: 'pointer' }} />
+              <label htmlFor="edit-co-nds" style={{ cursor: 'pointer', fontSize: 13, fontWeight: 500, color: editCoData.nds ? '#1d4ed8' : '#475569' }}>
+                Плательщик НДС {editCoData.nds ? '— сдаёт 300.00 (НДС) ежеквартально' : ''}
+              </label>
             </div>
             <div className="fr">
               <div className="fg"><label>📞 Телефон директора</label>
@@ -1825,6 +1843,14 @@ function AdminSection({ adminSettings, onSave }: { adminSettings: AdminSettings;
 }
 
 // ─── УПЛАТА НАЛОГОВ ─────────────────────────────────────────────────────────
+function fmtAmt(v: string): string {
+  const raw = (v || '').replace(/\s/g, '').replace(/[^\d.]/g, '')
+  if (!raw) return ''
+  const [int, dec] = raw.split('.')
+  const fmtInt = int.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  return dec !== undefined ? fmtInt + '.' + dec : fmtInt
+}
+
 function getPayPeriods(type: 'kpn' | 'nds', year: number) {
   if (type === 'kpn') {
     return [
@@ -1856,7 +1882,7 @@ function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYe
   const [selQ, setSelQ] = useState('2 квартал')
   const [paidFilter, setPaidFilter] = useState<'' | 'paid' | 'unpaid'>('')
   const active = companies.filter(c => c.status === 'Активная')
-  const base = paySubTab === 'nds' ? active.filter(c => c.nds || c.reg === 'ОУР (НДС)') : active
+  const base = paySubTab === 'nds' ? active.filter(c => c.nds || c.reg === 'ОУР (НДС)' || c.reg.includes('НДС')) : active
   const list = paySearch ? base.filter(c => c.n.toLowerCase().includes(paySearch.toLowerCase())) : base
   const periods = getPayPeriods(paySubTab, payYear)
   const p = periods.find(x => x.q === selQ) || periods[0]
@@ -1978,10 +2004,10 @@ function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYe
                     <td style={{ padding: '4px 10px' }}>
                       <input
                         type="text"
-                        value={e.amount}
-                        onChange={ev => onSave(key, { amount: ev.target.value })}
+                        value={fmtAmt(e.amount)}
+                        onChange={ev => onSave(key, { amount: fmtAmt(ev.target.value) })}
                         placeholder="0"
-                        style={{ width: 120, fontSize: 13, fontWeight: 600, padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: 6, textAlign: 'right' as const, outline: 'none', background: '#fff', color: '#111827' }}
+                        style={{ width: 130, fontSize: 13, fontWeight: 600, padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: 6, textAlign: 'right' as const, outline: 'none', background: '#fff', color: '#111827' }}
                       />
                     </td>
                     <td style={{ padding: '4px 10px' }}>
