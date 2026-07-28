@@ -49,7 +49,7 @@ const DEFAULT_ADMIN: AdminSettings = {
   risks: ['низкая', 'средняя', 'высокая'],
   taxReports: {
     'ОУР (НДС)': [
-      { code: '300.00 (НДС)', period: 'quarterly', hasMonths: true },
+      { code: '300.00 (НДС)', period: 'quarterly', hasMonths: false },
       { code: '200.00 (ИПН/СН)', period: 'quarterly', hasMonths: true },
       { code: '100.00 (год. КПН)', period: 'annual', hasMonths: false },
     ],
