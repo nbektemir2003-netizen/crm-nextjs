@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from 'react'
 import * as XLSX from 'xlsx'
 
 // ─── ТИПЫ ───────────────────────────────
-type Company = { id?: string; n: string; freq: string; reg: string; cat: string; b: string; risk: string; nds: boolean; status: string; skipReports: string[]; extraReports: string[] }
+type Company = { id?: string; n: string; freq: string; reg: string; cat: string; b: string; risk: string; nds: boolean; status: string; skipReports: string[]; extraReports: string[]; bin?: string }
 type Task = { id?: string; co: string; desc: string; emp: string; prio: string; date: string; st: string }
 type TabId = 'co' | 'tasks' | 'tax' | 'rep' | 'pay' | 'admin'
 type PayEntry = { amount: string; comment: string; paid: boolean }
@@ -313,6 +313,7 @@ export default function DashboardPage() {
             ...c,
             skipReports: cr[c.id!]?.skipReports || [],
             extraReports: cr[c.id!]?.extraReports || [],
+            bin: cr[c.id!]?.bin || '',
           })))
         }
       }
@@ -382,7 +383,7 @@ export default function DashboardPage() {
 
   // ─── КОМПАНИИ ───────────────────────────
   const filteredCos = companies.filter(c => {
-    if (coQ && !c.n.toLowerCase().includes(coQ.toLowerCase())) return false
+    if (coQ && !c.n.toLowerCase().includes(coQ.toLowerCase()) && !(c.bin || '').includes(coQ)) return false
     if (coFreq && c.freq !== coFreq) return false
     if (coCat && c.cat !== coCat) return false
     if (coReg && !c.reg.includes(coReg)) return false
@@ -405,14 +406,15 @@ export default function DashboardPage() {
     if (snapshot.id) {
       const [res] = await Promise.all([
         fetch('/api/companies', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(snapshot) }),
-        fetch('/api/company-reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: snapshot.id, skipReports: snapshot.skipReports || [], extraReports: snapshot.extraReports || [] }) }),
+        fetch('/api/company-reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: snapshot.id, skipReports: snapshot.skipReports || [], extraReports: snapshot.extraReports || [], bin: snapshot.bin || '' }) }),
       ])
       if (res.ok) {
         const updated = await res.json()
         const skip = snapshot.skipReports || []
         const extra = snapshot.extraReports || []
+        const bin = snapshot.bin || ''
         setCompanies(prev => prev.map(c => c.id === updated.id
-          ? { ...updated, skipReports: skip, extraReports: extra }
+          ? { ...updated, skipReports: skip, extraReports: extra, bin }
           : c
         ))
       }
@@ -643,6 +645,12 @@ export default function DashboardPage() {
   }
   const taxReps = applyRepFilters(reps.tax)
   const statReps = applyRepFilters(reps.stat)
+  const cosWithReports = new Set([...reps.tax.map(r => r.co), ...reps.stat.map(r => r.co)])
+  const cosWithoutReports = companies.filter(c =>
+    c.status === 'Активная' &&
+    !cosWithReports.has(c.n) &&
+    (!repSearch || c.n.toLowerCase().includes(repSearch.toLowerCase()))
+  )
   const stRep = {
     taxTotal: taxReps.length,
     taxDone: taxReps.filter(r => repDone[repKey(r)]).length,
@@ -800,7 +808,10 @@ export default function DashboardPage() {
             <tbody>
               {filteredCos.map(c => (
                 <tr key={c.id || c.n} style={{ cursor: 'pointer' }} onClick={() => { setEditCoData({ ...c }); setEditCoIdx(companies.findIndex(x => x.n === c.n)) }}>
-                  <td style={{ fontWeight: 500, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }} title={c.n}>{c.n}</td>
+                  <td style={{ maxWidth: 180 }}>
+                    <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.n}>{c.n}</div>
+                    {c.bin && <div style={{ fontSize: 10, color: '#94a3b8', fontFamily: 'monospace', letterSpacing: 0.5 }}>{c.bin}</div>}
+                  </td>
                   <td><span className={`b bfreq-${(c.freq||'').split(' ')[0].toLowerCase().replace(/[^a-zа-я]/g,'')}`} style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 99, fontSize: 10, padding: '2px 7px', whiteSpace: 'nowrap' as const }}>{c.freq}</span></td>
                   <td>{regBadge(c.reg)}</td>
                   <td style={{ fontSize: 10.5, color: '#64748b' }}>{c.cat}</td>
@@ -1004,8 +1015,37 @@ export default function DashboardPage() {
           <select value={repStatus} onChange={e => setRepStatus(e.target.value)}>
             <option value="">Все статусы</option>
             <option value="pending">Не сдан</option><option value="ready">Готов</option><option value="done">Сдан</option>
+            <option value="no-reports">Без отчёта</option>
           </select>
         </div>
+        {repStatus === 'no-reports' ? (
+          <div>
+            {cosWithoutReports.length === 0 ? (
+              <div className="empty">Все активные компании имеют отчёты</div>
+            ) : (
+              <div className="q-block">
+                <div className="q-head">
+                  <span>Компании без отчётов</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 10.5, fontWeight: 400 }}>{cosWithoutReports.length} компаний</span>
+                </div>
+                <div className="q-table">
+                  <table>
+                    <thead><tr><th>Организация</th><th>Режим</th><th>Группа</th></tr></thead>
+                    <tbody>
+                      {cosWithoutReports.map((c, i) => (
+                        <tr key={i}>
+                          <td style={{ fontWeight: 500, color: '#4f46e5', cursor: 'pointer' }} onClick={() => { setEditCoData({ ...c }); setEditCoIdx(companies.findIndex(x => x.n === c.n)) }}>{c.n}</td>
+                          <td>{regBadge(c.reg)}</td>
+                          <td style={{ fontSize: 11, color: '#64748b' }}>{c.freq}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
         <ReportsSection
           reports={repSubTab === 'tax' ? reps.tax : reps.stat}
           repDone={repDone}
@@ -1019,6 +1059,7 @@ export default function DashboardPage() {
           onEditCompany={(name) => { const co = companies.find(c => c.n === name); if (co) { setEditCoData({ ...co }); setEditCoIdx(companies.findIndex(c => c.n === name)) } }}
           QLABELS={QLABELS}
         />
+        )}
       </div>
 
 
@@ -1100,6 +1141,9 @@ export default function DashboardPage() {
             </div>
             <div className="fg"><label>Наименование</label>
               <input type="text" value={editCoData.n} onChange={e => setEditCoData(p => p ? { ...p, n: e.target.value } : p)} />
+            </div>
+            <div className="fg"><label>БИН / ИИН</label>
+              <input type="text" placeholder="123456789012" maxLength={12} value={editCoData.bin || ''} onChange={e => setEditCoData(p => p ? { ...p, bin: e.target.value } : p)} style={{ fontFamily: 'monospace', letterSpacing: 1 }} />
             </div>
             <div className="fr">
               <div className="fg"><label>Режим</label>
