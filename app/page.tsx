@@ -1331,7 +1331,12 @@ export default function DashboardPage() {
             </div>
             <div style={{ display: 'flex', gap: 8, margin: '6px 0 8px' }}>
               <div style={{ flex: 1, padding: '8px 12px', background: editCoData.nds ? '#eff6ff' : '#f8fafc', border: `1px solid ${editCoData.nds ? '#bfdbfe' : '#e2e8f0'}`, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
-                <input type="checkbox" id="edit-co-nds" checked={!!editCoData.nds} onChange={e => setEditCoData(p => p ? { ...p, nds: e.target.checked } : p)} style={{ width: 16, height: 16, accentColor: '#4f46e5', cursor: 'pointer' }} />
+                <input type="checkbox" id="edit-co-nds" checked={!!editCoData.nds} onChange={e => setEditCoData(p => {
+                  if (!p) return p
+                  const checked = e.target.checked
+                  const newSkip = checked ? (p.skipReports || []).filter(s => !s.includes('300')) : (p.skipReports || [])
+                  return { ...p, nds: checked, skipReports: newSkip }
+                })} style={{ width: 16, height: 16, accentColor: '#4f46e5', cursor: 'pointer' }} />
                 <label htmlFor="edit-co-nds" style={{ cursor: 'pointer', fontSize: 13, fontWeight: 500, color: editCoData.nds ? '#1d4ed8' : '#475569' }}>
                   Плательщик НДС {editCoData.nds ? '→ 300.00' : ''}
                 </label>
