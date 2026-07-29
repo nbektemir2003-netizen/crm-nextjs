@@ -2105,8 +2105,10 @@ function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYe
               {displayList.map((c, ci) => {
                 const key = `${c.n}|${paySubTab}|${p.q}|${payYear}`
                 const e = payEntries[key] || { amount: '', comment: '', paid: false }
+                const hasAmt = parseFloat((e.amount || '').replace(/\s/g, '').replace(',', '.')) > 0
+                const rowBg = e.paid ? '#f0fdf4' : hasAmt ? '#fff5f5' : '#ffffff'
                 return (
-                  <tr key={ci} style={{ borderBottom: '1px solid #f3f4f6', background: e.paid ? '#f0fdf4' : '#fff5f5' }}>
+                  <tr key={ci} style={{ borderBottom: '1px solid #f3f4f6', background: rowBg }}>
                     <td style={{ padding: '6px 16px', color: '#374151', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500 }} title={c.n}>
                       {c.n}
                     </td>
