@@ -1,7 +1,7 @@
 'use client'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import * as XLSX from 'xlsx'
 
 // ─── ТИПЫ ───────────────────────────────
@@ -288,6 +288,14 @@ export default function DashboardPage() {
   const [coPhones, setCoPhones] = useState<Record<string, string>>({})
   const [coTaxContacts, setCoTaxContacts] = useState<Record<string, string>>({})
 
+  // Refs для дебаунса — избегаем race condition при быстром вводе
+  const payDebounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const repExtraDebounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const taxCmtDebounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const payEntriesRef = useRef<Record<string, PayEntry>>({})
+  const repExtraRef = useRef<Record<string, { comment: string; cabinet: boolean }>>({})
+  const taxCommentsRef = useRef<Record<string, string>>({})
+
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
   }, [status, router])
@@ -295,6 +303,11 @@ export default function DashboardPage() {
   useEffect(() => {
     if (status === 'authenticated') loadData()
   }, [status])
+
+  // Синхронизируем рефы с текущим состоянием
+  useEffect(() => { payEntriesRef.current = payEntries }, [payEntries])
+  useEffect(() => { repExtraRef.current = repExtra }, [repExtra])
+  useEffect(() => { taxCommentsRef.current = taxComments }, [taxComments])
 
   useEffect(() => {
     document.body.classList.remove('dark')
@@ -313,17 +326,18 @@ export default function DashboardPage() {
   async function loadData() {
     setSyncText('Загрузка...'); setSyncCls('syncing')
     try {
-      const [coRes, taskRes, tdRes, rdRes, peRes, reRes, crRes] = await Promise.all([
+      const [coRes, taskRes, tdRes, rdRes, peRes, reRes, crRes, tcRes] = await Promise.all([
         fetch('/api/companies'), fetch('/api/tasks'),
         fetch('/api/taxdone'), fetch('/api/repdone'),
         fetch('/api/payentries'), fetch('/api/repextra'),
-        fetch('/api/company-reports'),
+        fetch('/api/company-reports'), fetch('/api/taxcomments'),
       ])
       if (taskRes.ok) { const d = await taskRes.json(); if (Array.isArray(d)) setTasks(d) }
       if (tdRes.ok) { const d = await tdRes.json(); if (d && !d.error) setTaxDone(d) }
       if (rdRes.ok) { const d = await rdRes.json(); if (d && !d.error) setRepDone(d) }
       if (peRes.ok) { const d = await peRes.json(); if (d && !d.error) setPayEntries(d) }
       if (reRes.ok) { const d = await reRes.json(); if (d && !d.error) setRepExtra(d) }
+      if (tcRes.ok) { const d = await tcRes.json(); if (d && !d.error) setTaxComments(prev => ({ ...JSON.parse(localStorage.getItem('crm_taxComments') || '{}'), ...d })) }
       if (coRes.ok) {
         const cos = await coRes.json()
         if (Array.isArray(cos)) {
@@ -350,25 +364,55 @@ export default function DashboardPage() {
   }
 
   function savePayEntry(key: string, patch: Partial<PayEntry>) {
-    const existing: PayEntry = payEntries[key] || { amount: '', comment: '', paid: false }
+    const existing: PayEntry = payEntriesRef.current[key] || { amount: '', comment: '', paid: false }
     const updated = { ...existing, ...patch }
     setPayEntries(nd => ({ ...nd, [key]: updated }))
-    fetch('/api/payentries', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify([{ key, ...updated }]),
-    })
+
+    if (patch.paid !== undefined) {
+      // Чекбокс — сохраняем сразу
+      fetch('/api/payentries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([{ key, ...updated }]),
+      })
+    } else {
+      // Текстовые поля — дебаунс 800мс чтобы избежать race condition
+      if (payDebounceRef.current[key]) clearTimeout(payDebounceRef.current[key])
+      payDebounceRef.current[key] = setTimeout(() => {
+        const latest = payEntriesRef.current[key] || updated
+        fetch('/api/payentries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify([{ key, ...latest }]),
+        })
+      }, 800)
+    }
   }
 
   function saveRepExtra(key: string, patch: Partial<{ comment: string; cabinet: boolean }>) {
-    const existing = repExtra[key] || { comment: '', cabinet: false }
+    const existing = repExtraRef.current[key] || { comment: '', cabinet: false }
     const updated = { ...existing, ...patch }
     setRepExtra(nd => ({ ...nd, [key]: updated }))
-    fetch('/api/repextra', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify([{ key, ...updated }]),
-    })
+
+    if (patch.cabinet !== undefined) {
+      // Чекбокс — сохраняем сразу
+      fetch('/api/repextra', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([{ key, ...updated }]),
+      })
+    } else {
+      // Текстовое поле — дебаунс 800мс
+      if (repExtraDebounceRef.current[key]) clearTimeout(repExtraDebounceRef.current[key])
+      repExtraDebounceRef.current[key] = setTimeout(() => {
+        const latest = repExtraRef.current[key] || updated
+        fetch('/api/repextra', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify([{ key, ...latest }]),
+        })
+      }, 800)
+    }
   }
 
   function saveTaxDone(nd: Record<string, boolean>, changedKeys?: string[]) {
@@ -387,8 +431,19 @@ export default function DashboardPage() {
   }
 
   function saveTaxComment(key: string, val: string) {
-    const nc = { ...taxComments, [key]: val }
-    setTaxComments(nc); localStorage.setItem('crm_taxComments', JSON.stringify(nc))
+    const nc = { ...taxCommentsRef.current, [key]: val }
+    setTaxComments(nc)
+    localStorage.setItem('crm_taxComments', JSON.stringify(nc))
+    // Сохраняем в API с дебаунсом
+    if (taxCmtDebounceRef.current[key]) clearTimeout(taxCmtDebounceRef.current[key])
+    taxCmtDebounceRef.current[key] = setTimeout(() => {
+      const latestVal = taxCommentsRef.current[key] ?? val
+      fetch('/api/taxcomments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, val: latestVal }),
+      })
+    }, 800)
   }
   function saveCoPhone(id: string, val: string) {
     const n = { ...coPhones, [id]: val }
