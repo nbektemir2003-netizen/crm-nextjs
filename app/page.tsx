@@ -1847,6 +1847,28 @@ function AdminSection({ adminSettings, onSave }: { adminSettings: AdminSettings;
   const [userMsg, setUserMsg] = useState('')
   const [userErr, setUserErr] = useState('')
   const [showPwd, setShowPwd] = useState(false)
+  const [migrOld, setMigrOld] = useState('')
+  const [migrNew, setMigrNew] = useState('')
+  const [migrMsg, setMigrMsg] = useState('')
+  const [migrLoading, setMigrLoading] = useState(false)
+
+  async function migrateKeys() {
+    if (!migrOld.trim() || !migrNew.trim()) { setMigrMsg('Заполните оба поля'); return }
+    if (migrOld.trim() === migrNew.trim()) { setMigrMsg('Имена одинаковые'); return }
+    setMigrLoading(true); setMigrMsg('')
+    const res = await fetch('/api/rename-company', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldName: migrOld.trim(), newName: migrNew.trim() }),
+    })
+    setMigrLoading(false)
+    if (res.ok) {
+      setMigrMsg(`✓ Данные перенесены: "${migrOld.trim()}" → "${migrNew.trim()}"`)
+      setMigrOld(''); setMigrNew('')
+    } else {
+      setMigrMsg('Ошибка при переносе — проверьте консоль')
+    }
+  }
 
   async function loadUsers() {
     setUsersLoading(true)
@@ -2104,6 +2126,34 @@ function AdminSection({ adminSettings, onSave }: { adminSettings: AdminSettings;
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Восстановление данных при переименовании */}
+          <div style={{ gridColumn: '1 / -1', background: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: 14, padding: 20, marginTop: 4 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#92400e', marginBottom: 12 }}>🔧 Восстановление данных при переименовании компании</div>
+            <div style={{ fontSize: 12, color: '#78350f', marginBottom: 14 }}>
+              Если вы переименовали компанию и данные (отчёты, налоги, суммы) пропали — введите старое и новое название. Все данные перенесутся.
+            </div>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' as const }}>
+              <div>
+                <div style={{ fontSize: 11, color: '#92400e', marginBottom: 4 }}>Старое название (было)</div>
+                <input value={migrOld} onChange={e => setMigrOld(e.target.value)}
+                  placeholder="ИП ALDIS"
+                  style={{ fontSize: 13, padding: '7px 10px', border: '1.5px solid #fcd34d', borderRadius: 7, outline: 'none', width: 240, background: '#fff' }} />
+              </div>
+              <div style={{ fontSize: 18, color: '#d97706', paddingBottom: 2 }}>→</div>
+              <div>
+                <div style={{ fontSize: 11, color: '#92400e', marginBottom: 4 }}>Новое название (стало)</div>
+                <input value={migrNew} onChange={e => setMigrNew(e.target.value)}
+                  placeholder="ИП ALDIS(ЖОО)"
+                  style={{ fontSize: 13, padding: '7px 10px', border: '1.5px solid #fcd34d', borderRadius: 7, outline: 'none', width: 240, background: '#fff' }} />
+              </div>
+              <button onClick={migrateKeys} disabled={migrLoading}
+                style={{ padding: '8px 16px', background: migrLoading ? '#d97706' : '#f59e0b', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                {migrLoading ? 'Перенос...' : 'Перенести данные'}
+              </button>
+            </div>
+            {migrMsg && <div style={{ marginTop: 10, fontSize: 12, color: migrMsg.startsWith('✓') ? '#166534' : '#991b1b', background: migrMsg.startsWith('✓') ? '#dcfce7' : '#fee2e2', padding: '7px 12px', borderRadius: 7 }}>{migrMsg}</div>}
           </div>
         </div>
       )}
