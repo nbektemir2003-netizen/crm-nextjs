@@ -42,7 +42,7 @@ export async function POST(req: Request) {
 
   const { data, error } = await supabaseAdmin
     .from('User')
-    .insert({ name, email, password: hashedPassword, role: role || 'user' })
+    .insert({ name, email, passwordHash: hashedPassword, role: role || 'user' })
     .select('id, name, email, role')
     .single()
 
