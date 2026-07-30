@@ -334,10 +334,14 @@ export default function DashboardPage() {
       ])
       if (taskRes.ok) { const d = await taskRes.json(); if (Array.isArray(d)) setTasks(d) }
       if (tdRes.ok) { const d = await tdRes.json(); if (d && !d.error) setTaxDone(d) }
-      if (rdRes.ok) { const d = await rdRes.json(); if (d && !d.error) setRepDone(d) }
+      if (rdRes.ok) {
+        const d = await rdRes.json()
+        if (d && !d.error) setRepDone(d)
+        else { setSyncText(`Ошибка repDone: ${d?.error || rdRes.status}`); setSyncCls('error') }
+      } else { setSyncText(`Ошибка загрузки отчётов (${rdRes.status})`); setSyncCls('error') }
       if (peRes.ok) { const d = await peRes.json(); if (d && !d.error) setPayEntries(d) }
       if (reRes.ok) { const d = await reRes.json(); if (d && !d.error) setRepExtra(d) }
-      if (tcRes.ok) { const d = await tcRes.json(); if (d && !d.error) setTaxComments(prev => ({ ...JSON.parse(localStorage.getItem('crm_taxComments') || '{}'), ...d })) }
+      if (tcRes.ok) { const d = await tcRes.json(); if (d && !d.error) setTaxComments(() => ({ ...JSON.parse(localStorage.getItem('crm_taxComments') || '{}'), ...d })) }
       if (coRes.ok) {
         const cos = await coRes.json()
         if (Array.isArray(cos)) {
@@ -352,9 +356,9 @@ export default function DashboardPage() {
           })))
         }
       }
-      setSyncText('Синхронизировано ✓'); setSyncCls('')
-    } catch {
-      setSyncText('Офлайн режим'); setSyncCls('error')
+      if (rdRes.ok) { setSyncText('Синхронизировано ✓'); setSyncCls('') }
+    } catch (e) {
+      setSyncText(`Ошибка: ${e instanceof Error ? e.message : 'сеть'}`); setSyncCls('error')
     }
   }
 
@@ -477,7 +481,9 @@ export default function DashboardPage() {
 
   async function saveCoEdit() {
     if (!editCoData) return
-    const snapshot = editCoData  // capture before any async work
+    const snapshot = editCoData
+    const oldName = companies.find(c => c.id === snapshot.id)?.n || ''
+    const newName = snapshot.n
     setSyncText('Сохранение...'); setSyncCls('syncing')
     if (snapshot.id) {
       const [res] = await Promise.all([
@@ -495,6 +501,29 @@ export default function DashboardPage() {
           ? { ...updated, skipReports: skip, extraReports: extra, bin, noReports, hasEmployees }
           : c
         ))
+      }
+
+      // Если имя изменилось — мигрируем все ключи в базе и в локальном состоянии
+      if (oldName && newName && oldName !== newName) {
+        fetch('/api/rename-company', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ oldName, newName }),
+        })
+        // Обновляем локальное состояние немедленно
+        const renameKeys = <T>(obj: Record<string, T>): Record<string, T> => {
+          const prefix = oldName + '|'
+          const result: Record<string, T> = {}
+          for (const [k, v] of Object.entries(obj)) {
+            result[k.startsWith(prefix) ? newName + '|' + k.slice(prefix.length) : k] = v
+          }
+          return result
+        }
+        setTaxDone(prev => renameKeys(prev))
+        setRepDone(prev => renameKeys(prev))
+        setRepExtra(prev => renameKeys(prev))
+        setPayEntries(prev => renameKeys(prev))
+        setTaxComments(prev => renameKeys(prev))
       }
     }
     setEditCoIdx(-1); setEditCoData(null)
@@ -867,7 +896,7 @@ export default function DashboardPage() {
             {tab === 'co' ? 'Компании' : tab === 'tasks' ? 'Задачи' : tab === 'tax' ? 'Налоги' : tab === 'rep' ? 'Отчётность' : tab === 'pay' ? 'Уплата налогов' : 'Администрирование'}
           </span>
           <div className="crm-topbar-actions">
-            <span className={`sync-status ${syncCls}`}>{syncText}</span>
+            <span className={`sync-status ${syncCls}`} style={{ cursor: syncCls === 'error' ? 'pointer' : 'default' }} onClick={() => syncCls === 'error' && loadData()} title={syncCls === 'error' ? 'Нажмите для повтора' : undefined}>{syncText}{syncCls === 'error' ? ' 🔄' : ''}</span>
             <span style={{ fontSize: 12, color: '#94a3b8' }}>{dateStr}</span>
             <button className="crm-icon-btn" onClick={() => setShowNotif(true)} title="Уведомления">
               <i className="ti ti-bell"></i>
