@@ -511,19 +511,18 @@ export default function DashboardPage() {
           body: JSON.stringify({ oldName, newName }),
         })
         // Обновляем локальное состояние немедленно
-        const renameKeys = <T>(obj: Record<string, T>): Record<string, T> => {
-          const prefix = oldName + '|'
-          const result: Record<string, T> = {}
-          for (const [k, v] of Object.entries(obj)) {
+        const prefix = oldName + '|'
+        const rekey = (obj: Record<string, unknown>): Record<string, unknown> => {
+          const result: Record<string, unknown> = {}
+          for (const [k, v] of Object.entries(obj))
             result[k.startsWith(prefix) ? newName + '|' + k.slice(prefix.length) : k] = v
-          }
           return result
         }
-        setTaxDone(prev => renameKeys(prev))
-        setRepDone(prev => renameKeys(prev))
-        setRepExtra(prev => renameKeys(prev))
-        setPayEntries(prev => renameKeys(prev))
-        setTaxComments(prev => renameKeys(prev))
+        setTaxDone(prev => rekey(prev) as Record<string, boolean>)
+        setRepDone(prev => rekey(prev) as Record<string, boolean>)
+        setRepExtra(prev => rekey(prev) as Record<string, { comment: string; cabinet: boolean }>)
+        setPayEntries(prev => rekey(prev) as Record<string, PayEntry>)
+        setTaxComments(prev => rekey(prev) as Record<string, string>)
       }
     }
     setEditCoIdx(-1); setEditCoData(null)
@@ -1833,7 +1832,7 @@ function EditCoReports({ company, onChange, adminSettings }: { company: Company;
 
 // ─── КОМПОНЕНТ: АДМИНИСТРИРОВАНИЕ ──────────────
 function AdminSection({ adminSettings, onSave }: { adminSettings: AdminSettings; onSave: (s: AdminSettings) => void }) {
-  const [sub, setSub] = useState<'refs' | 'tax' | 'stat' | 'users'>('refs')
+  const [sub, setSub] = useState<'refs' | 'tax' | 'stat' | 'users' | 'migrate'>('refs')
 
   // ── Пользователи ──
   type UserRow = { id: string; name: string; email: string; role: string }
@@ -1963,6 +1962,7 @@ function AdminSection({ adminSettings, onSave }: { adminSettings: AdminSettings;
           <button className={`stab${sub === 'tax' ? ' active' : ''}`} onClick={() => setSub('tax')}>📋 Нал. отчёты</button>
           <button className={`stab${sub === 'stat' ? ' active' : ''}`} onClick={() => setSub('stat')}>📊 Стат. отчёты</button>
           <button className={`stab${sub === 'users' ? ' active' : ''}`} onClick={() => { setSub('users'); if (!usersLoaded) loadUsers() }}>👥 Пользователи</button>
+          <button className={`stab${sub === 'migrate' ? ' active' : ''}`} onClick={() => setSub('migrate')}>🔧 Миграция</button>
         </div>
         <span style={{ fontSize: 11, color: '#94a3b8' }}>Настройки применяются ко вкладкам Налоги и Отчётность</span>
       </div>
@@ -2128,32 +2128,45 @@ function AdminSection({ adminSettings, onSave }: { adminSettings: AdminSettings;
             </div>
           </div>
 
-          {/* Восстановление данных при переименовании */}
-          <div style={{ gridColumn: '1 / -1', background: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: 14, padding: 20, marginTop: 4 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#92400e', marginBottom: 12 }}>🔧 Восстановление данных при переименовании компании</div>
-            <div style={{ fontSize: 12, color: '#78350f', marginBottom: 14 }}>
-              Если вы переименовали компанию и данные (отчёты, налоги, суммы) пропали — введите старое и новое название. Все данные перенесутся.
+        </div>
+      )}
+
+      {/* ── Миграция ── */}
+      {sub === 'migrate' && (
+        <div style={{ maxWidth: 680 }}>
+          <div style={{ background: '#fff', borderRadius: 14, padding: 24, boxShadow: '0 2px 8px rgba(99,102,241,.08)', marginBottom: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginBottom: 8 }}>🔧 Восстановление данных при переименовании</div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 20, lineHeight: 1.6 }}>
+              Если вы переименовали компанию и данные (отчёты, налоги, суммы, комментарии) пропали — введите старое и новое название. Все данные будут перенесены на новое название.
             </div>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' as const }}>
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
               <div>
-                <div style={{ fontSize: 11, color: '#92400e', marginBottom: 4 }}>Старое название (было)</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>СТАРОЕ НАЗВАНИЕ (как было до переименования)</div>
                 <input value={migrOld} onChange={e => setMigrOld(e.target.value)}
-                  placeholder="ИП ALDIS"
-                  style={{ fontSize: 13, padding: '7px 10px', border: '1.5px solid #fcd34d', borderRadius: 7, outline: 'none', width: 240, background: '#fff' }} />
+                  placeholder="Например: ИП ALDIS"
+                  style={{ width: '100%', fontSize: 14, padding: '10px 12px', border: '1.5px solid #e5e7eb', borderRadius: 8, outline: 'none', boxSizing: 'border-box' as const }} />
               </div>
-              <div style={{ fontSize: 18, color: '#d97706', paddingBottom: 2 }}>→</div>
               <div>
-                <div style={{ fontSize: 11, color: '#92400e', marginBottom: 4 }}>Новое название (стало)</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>НОВОЕ НАЗВАНИЕ (текущее название в системе)</div>
                 <input value={migrNew} onChange={e => setMigrNew(e.target.value)}
-                  placeholder="ИП ALDIS(ЖОО)"
-                  style={{ fontSize: 13, padding: '7px 10px', border: '1.5px solid #fcd34d', borderRadius: 7, outline: 'none', width: 240, background: '#fff' }} />
+                  placeholder="Например: ИП ALDIS(ЖОО)"
+                  style={{ width: '100%', fontSize: 14, padding: '10px 12px', border: '1.5px solid #e5e7eb', borderRadius: 8, outline: 'none', boxSizing: 'border-box' as const }} />
               </div>
               <button onClick={migrateKeys} disabled={migrLoading}
-                style={{ padding: '8px 16px', background: migrLoading ? '#d97706' : '#f59e0b', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                {migrLoading ? 'Перенос...' : 'Перенести данные'}
+                style={{ padding: '11px 20px', background: migrLoading ? '#9ca3af' : '#6366f1', color: '#fff', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: migrLoading ? 'not-allowed' : 'pointer' }}>
+                {migrLoading ? '⏳ Перенос данных...' : 'Перенести данные →'}
               </button>
+              {migrMsg && (
+                <div style={{ padding: '10px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                  background: migrMsg.startsWith('✓') ? '#dcfce7' : '#fee2e2',
+                  color: migrMsg.startsWith('✓') ? '#166534' : '#991b1b' }}>
+                  {migrMsg}
+                </div>
+              )}
             </div>
-            {migrMsg && <div style={{ marginTop: 10, fontSize: 12, color: migrMsg.startsWith('✓') ? '#166534' : '#991b1b', background: migrMsg.startsWith('✓') ? '#dcfce7' : '#fee2e2', padding: '7px 12px', borderRadius: 7 }}>{migrMsg}</div>}
+          </div>
+          <div style={{ background: '#f8fafc', borderRadius: 12, padding: '14px 18px', fontSize: 12, color: '#6b7280', border: '1px solid #e5e7eb' }}>
+            <strong>Примечание:</strong> После переноса данных обновите страницу (F5), чтобы увидеть восстановленные данные в отчётах и налогах.
           </div>
         </div>
       )}
