@@ -1804,7 +1804,54 @@ function EditCoReports({ company, onChange, adminSettings }: { company: Company;
 
 // ─── КОМПОНЕНТ: АДМИНИСТРИРОВАНИЕ ──────────────
 function AdminSection({ adminSettings, onSave }: { adminSettings: AdminSettings; onSave: (s: AdminSettings) => void }) {
-  const [sub, setSub] = useState<'refs' | 'tax' | 'stat'>('refs')
+  const [sub, setSub] = useState<'refs' | 'tax' | 'stat' | 'users'>('refs')
+
+  // ── Пользователи ──
+  type UserRow = { id: string; name: string; email: string; role: string }
+  const [userList, setUserList] = useState<UserRow[]>([])
+  const [usersLoaded, setUsersLoaded] = useState(false)
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [newUserName, setNewUserName] = useState('')
+  const [newUserEmail, setNewUserEmail] = useState('')
+  const [newUserPassword, setNewUserPassword] = useState('')
+  const [newUserRole, setNewUserRole] = useState('user')
+  const [userMsg, setUserMsg] = useState('')
+  const [userErr, setUserErr] = useState('')
+  const [showPwd, setShowPwd] = useState(false)
+
+  async function loadUsers() {
+    setUsersLoading(true)
+    const res = await fetch('/api/admin/users')
+    if (res.ok) { const d = await res.json(); setUserList(d) }
+    setUsersLoading(false); setUsersLoaded(true)
+  }
+
+  async function createUser() {
+    setUserErr(''); setUserMsg('')
+    if (!newUserName.trim() || !newUserEmail.trim() || !newUserPassword.trim()) {
+      setUserErr('Заполните имя, email и пароль'); return
+    }
+    const res = await fetch('/api/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newUserName.trim(), email: newUserEmail.trim(), password: newUserPassword, role: newUserRole }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setUserErr(data.error || 'Ошибка'); return }
+    setUserList(p => [...p, data])
+    setNewUserName(''); setNewUserEmail(''); setNewUserPassword('')
+    setUserMsg(`Пользователь ${data.name} создан`)
+  }
+
+  async function deleteUser(u: UserRow) {
+    if (!confirm(`Удалить пользователя ${u.name} (${u.email})?`)) return
+    await fetch('/api/admin/users', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: u.id }),
+    })
+    setUserList(p => p.filter(x => x.id !== u.id))
+  }
   const [newItems, setNewItems] = useState<Record<string, string>>({})
   const [newRep, setNewRep] = useState<Record<string, { code: string; period: string; hasMonths: boolean; onlyEvenQ: boolean }>>({})
 
@@ -1864,6 +1911,7 @@ function AdminSection({ adminSettings, onSave }: { adminSettings: AdminSettings;
           <button className={`stab${sub === 'refs' ? ' active' : ''}`} onClick={() => setSub('refs')}>📚 Справочники</button>
           <button className={`stab${sub === 'tax' ? ' active' : ''}`} onClick={() => setSub('tax')}>📋 Нал. отчёты</button>
           <button className={`stab${sub === 'stat' ? ' active' : ''}`} onClick={() => setSub('stat')}>📊 Стат. отчёты</button>
+          <button className={`stab${sub === 'users' ? ' active' : ''}`} onClick={() => { setSub('users'); if (!usersLoaded) loadUsers() }}>👥 Пользователи</button>
         </div>
         <span style={{ fontSize: 11, color: '#94a3b8' }}>Настройки применяются ко вкладкам Налоги и Отчётность</span>
       </div>
@@ -1945,6 +1993,88 @@ function AdminSection({ adminSettings, onSave }: { adminSettings: AdminSettings;
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Пользователи ── */}
+      {sub === 'users' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
+
+          {/* Форма создания */}
+          <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 2px 8px rgba(99,102,241,.08)' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 14, paddingBottom: 8, borderBottom: '1px solid #f3f4f6' }}>
+              ➕ Новый пользователь
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
+              <div>
+                <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>Имя</div>
+                <input value={newUserName} onChange={e => setNewUserName(e.target.value)}
+                  placeholder="Нурдаулет"
+                  style={{ width: '100%', fontSize: 13, padding: '7px 10px', border: '1.5px solid #e5e7eb', borderRadius: 7, outline: 'none', boxSizing: 'border-box' as const }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>Email</div>
+                <input value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)}
+                  placeholder="user@buhdesk.kz" type="email"
+                  style={{ width: '100%', fontSize: 13, padding: '7px 10px', border: '1.5px solid #e5e7eb', borderRadius: 7, outline: 'none', boxSizing: 'border-box' as const }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>Пароль</div>
+                <div style={{ position: 'relative' as const }}>
+                  <input value={newUserPassword} onChange={e => setNewUserPassword(e.target.value)}
+                    type={showPwd ? 'text' : 'password'} placeholder="••••••••"
+                    style={{ width: '100%', fontSize: 13, padding: '7px 36px 7px 10px', border: '1.5px solid #e5e7eb', borderRadius: 7, outline: 'none', boxSizing: 'border-box' as const }} />
+                  <button onClick={() => setShowPwd(p => !p)}
+                    style={{ position: 'absolute' as const, right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#9ca3af' }}>
+                    {showPwd ? '🙈' : '👁'}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>Роль</div>
+                <select value={newUserRole} onChange={e => setNewUserRole(e.target.value)}
+                  style={{ width: '100%', fontSize: 13, padding: '7px 10px', border: '1.5px solid #e5e7eb', borderRadius: 7, outline: 'none', boxSizing: 'border-box' as const, background: '#fff' }}>
+                  <option value="user">Сотрудник</option>
+                  <option value="admin">Администратор</option>
+                </select>
+              </div>
+              {userErr && <div style={{ background: '#fee2e2', color: '#991b1b', fontSize: 12, padding: '7px 10px', borderRadius: 7 }}>{userErr}</div>}
+              {userMsg && <div style={{ background: '#dcfce7', color: '#166534', fontSize: 12, padding: '7px 10px', borderRadius: 7 }}>{userMsg}</div>}
+              <button onClick={createUser}
+                style={{ padding: '9px 16px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>
+                Создать пользователя
+              </button>
+            </div>
+          </div>
+
+          {/* Список пользователей */}
+          <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 2px 8px rgba(99,102,241,.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, paddingBottom: 8, borderBottom: '1px solid #f3f4f6' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>👥 Список пользователей</div>
+              <button onClick={loadUsers} style={{ fontSize: 11, padding: '4px 10px', background: '#f3f4f6', border: 'none', borderRadius: 6, cursor: 'pointer', color: '#374151' }}>
+                {usersLoading ? '...' : '🔄 Обновить'}
+              </button>
+            </div>
+            {usersLoading && <div style={{ fontSize: 13, color: '#94a3b8', textAlign: 'center' as const, padding: '20px 0' }}>Загрузка...</div>}
+            {!usersLoading && userList.length === 0 && <div style={{ fontSize: 13, color: '#94a3b8', textAlign: 'center' as const, padding: '20px 0' }}>Нет пользователей</div>}
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 6 }}>
+              {userList.map(u => (
+                <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: '#f9fafb', borderRadius: 8, border: '1px solid #f3f4f6' }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#6366f1', flexShrink: 0 }}>
+                    {u.name[0]?.toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{u.name}</div>
+                    <div style={{ fontSize: 11, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{u.email}</div>
+                  </div>
+                  <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 99, background: u.role === 'admin' ? '#e0e7ff' : '#f3f4f6', color: u.role === 'admin' ? '#6366f1' : '#6b7280', fontWeight: 600, flexShrink: 0 }}>
+                    {u.role === 'admin' ? 'Админ' : 'Сотрудник'}
+                  </span>
+                  <button onClick={() => deleteUser(u)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fca5a5', fontSize: 16, flexShrink: 0, lineHeight: 1 }} title="Удалить">✕</button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

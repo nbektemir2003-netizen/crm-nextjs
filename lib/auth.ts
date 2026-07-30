@@ -1,6 +1,7 @@
 import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import { createClient } from '@supabase/supabase-js'
+import bcrypt from 'bcryptjs'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || 'crm-outsource-2026-kz-secret-key-xbx',
@@ -17,6 +18,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const sb = createClient('https://rqrbjiyqazarlomycdzc.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxcmJqaXlxYXphcmxvbXljZHpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3ODIzMDAsImV4cCI6MjA5ODM1ODMwMH0.dne7GGb29XICld8a5A9T0OyWsns-ChdII8GFJ2q4k08')
         const { data } = await sb.from('User').select('*').eq('email', credentials.email as string).single()
         if (!data) return null
+        // Проверяем пароль: bcrypt-хеш (новые пользователи) или plain (старые)
+        const pwd = credentials.password as string
+        let ok = false
+        if (data.password) {
+          const isBcrypt = (data.password as string).startsWith('$2')
+          ok = isBcrypt
+            ? await bcrypt.compare(pwd, data.password as string)
+            : data.password === pwd
+        } else {
+          // Если поля password нет — разрешаем вход (обратная совместимость)
+          ok = true
+        }
+        if (!ok) return null
         return { id: data.id, name: data.name, email: data.email, role: data.role }
       },
     }),
