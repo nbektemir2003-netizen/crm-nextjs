@@ -39,10 +39,11 @@ export async function POST(req: Request) {
   }
 
   const hashedPassword = await bcrypt.hash(password, 10)
+  const id = crypto.randomUUID()
 
   const { data, error } = await supabaseAdmin
     .from('User')
-    .insert({ name, email, passwordHash: hashedPassword, role: role || 'user' })
+    .insert({ id, name, email, passwordHash: hashedPassword, role: role || 'user' })
     .select('id, name, email, role')
     .single()
 
