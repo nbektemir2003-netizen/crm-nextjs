@@ -367,8 +367,8 @@ export default function DashboardPage() {
     setTimeout(() => setToastVisible(false), 2500)
   }
 
-  function savePayEntry(key: string, patch: Partial<PayEntry>) {
-    const existing: PayEntry = payEntriesRef.current[key] || { amount: '', comment: '', paid: false }
+  function savePayEntry(key: string, patch: Partial<PayEntry>, base?: PayEntry) {
+    const existing: PayEntry = base || payEntriesRef.current[key] || { amount: '', comment: '', paid: false }
     const updated = { ...existing, ...patch }
     setPayEntries(nd => ({ ...nd, [key]: updated }))
 
@@ -2257,11 +2257,35 @@ function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYe
   onYearChange: (y: number) => void
   onSubTabChange: (t: 'kpn' | 'nds') => void
   onSearchChange: (s: string) => void
-  onSave: (key: string, patch: Partial<PayEntry>) => void
+  onSave: (key: string, patch: Partial<PayEntry>, base?: PayEntry) => void
   adminSettings: AdminSettings
 }) {
   const [selQ, setSelQ] = useState('2 квартал')
   const [paidFilter, setPaidFilter] = useState<'' | 'paid' | 'unpaid'>('')
+  const [manualCoIds, setManualCoIds] = useState<string[]>([])
+  const [showAddCo, setShowAddCo] = useState(false)
+  const [addCoSearch, setAddCoSearch] = useState('')
+
+  const manualKey = `payManual_${paySubTab}_${selQ}_${payYear}`
+
+  useEffect(() => {
+    const saved = localStorage.getItem(manualKey)
+    try { setManualCoIds(saved ? JSON.parse(saved) : []) } catch { setManualCoIds([]) }
+  }, [manualKey])
+
+  function addManualCo(id: string) {
+    const updated = [...manualCoIds, id]
+    setManualCoIds(updated)
+    localStorage.setItem(manualKey, JSON.stringify(updated))
+    setShowAddCo(false)
+    setAddCoSearch('')
+  }
+  function removeManualCo(id: string) {
+    const updated = manualCoIds.filter(x => x !== id)
+    setManualCoIds(updated)
+    localStorage.setItem(manualKey, JSON.stringify(updated))
+  }
+
   const active = companies.filter(c => c.status === 'Активная' && !c.noReports)
   const base = paySubTab === 'nds' ? active.filter(c => c.nds || c.reg === 'ОУР (НДС)' || c.reg.includes('НДС')) : active
   const list = paySearch ? base.filter(c => c.n.toLowerCase().includes(paySearch.toLowerCase())) : base
@@ -2297,6 +2321,13 @@ function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYe
   const filteredQ = filteredList.filter(c => !isAnnual(c))
   const filteredA = filteredList.filter(c => isAnnual(c))
   const annualDueLabel = `31 марта ${payYear + 1}`
+
+  // Вручную добавленные компании (не входящие в основной список)
+  const visibleIds = new Set(visibleList.map(c => c.id || c.n))
+  const allActive = companies.filter(c => c.status === 'Активная')
+  const manualCos = allActive.filter(c => c.id && manualCoIds.includes(c.id) && !visibleIds.has(c.id))
+  const availableCos = allActive.filter(c => c.id && !manualCoIds.includes(c.id) && !visibleIds.has(c.id))
+  const availableFiltered = addCoSearch ? availableCos.filter(c => c.n.toLowerCase().includes(addCoSearch.toLowerCase())) : availableCos
 
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const dueDate = new Date(p.due); dueDate.setHours(0, 0, 0, 0)
@@ -2396,15 +2427,15 @@ function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYe
                     <td style={{ padding: '6px 16px', color: '#374151', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500 }} title={c.n}>{c.n}</td>
                     <td style={{ padding: '6px 10px', color: '#9ca3af', fontSize: 11, whiteSpace: 'nowrap' as const }}>{c.reg}</td>
                     <td style={{ padding: '4px 10px' }}>
-                      <input type="text" value={fmtAmt(e.amount)} onChange={ev => onSave(key, { amount: fmtAmt(ev.target.value) })} placeholder="0"
+                      <input type="text" value={fmtAmt(e.amount)} onChange={ev => onSave(key, { amount: fmtAmt(ev.target.value) }, e)} placeholder="0"
                         style={{ width: 130, fontSize: 13, fontWeight: 600, padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: 6, textAlign: 'right' as const, outline: 'none', background: '#fff', color: '#111827' }} />
                     </td>
                     <td style={{ padding: '4px 10px' }}>
-                      <input type="text" value={e.comment} onChange={ev => onSave(key, { comment: ev.target.value })} placeholder="Заметка..."
+                      <input type="text" value={e.comment} onChange={ev => onSave(key, { comment: ev.target.value }, e)} placeholder="Заметка..."
                         style={{ width: '100%', minWidth: 160, fontSize: 12, padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: 6, outline: 'none', background: '#fff', color: '#111827' }} />
                     </td>
                     <td style={{ padding: '4px 10px', textAlign: 'center' as const }}>
-                      <input type="checkbox" checked={e.paid} onChange={ev => onSave(key, { paid: ev.target.checked })} style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#16a34a' }} />
+                      <input type="checkbox" checked={e.paid} onChange={ev => onSave(key, { paid: ev.target.checked }, e)} style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#16a34a' }} />
                     </td>
                   </tr>
                 )
@@ -2427,15 +2458,51 @@ function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYe
                         <td style={{ padding: '6px 16px', color: '#374151', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500 }} title={c.n}>{c.n}</td>
                         <td style={{ padding: '6px 10px', color: '#9ca3af', fontSize: 11, whiteSpace: 'nowrap' as const }}>{c.reg}</td>
                         <td style={{ padding: '4px 10px' }}>
-                          <input type="text" value={fmtAmt(e.amount)} onChange={ev => onSave(key, { amount: fmtAmt(ev.target.value) })} placeholder="0"
+                          <input type="text" value={fmtAmt(e.amount)} onChange={ev => onSave(key, { amount: fmtAmt(ev.target.value) }, e)} placeholder="0"
                             style={{ width: 130, fontSize: 13, fontWeight: 600, padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: 6, textAlign: 'right' as const, outline: 'none', background: '#fff', color: '#111827' }} />
                         </td>
                         <td style={{ padding: '4px 10px' }}>
-                          <input type="text" value={e.comment} onChange={ev => onSave(key, { comment: ev.target.value })} placeholder="Заметка..."
+                          <input type="text" value={e.comment} onChange={ev => onSave(key, { comment: ev.target.value }, e)} placeholder="Заметка..."
                             style={{ width: '100%', minWidth: 160, fontSize: 12, padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: 6, outline: 'none', background: '#fff', color: '#111827' }} />
                         </td>
                         <td style={{ padding: '4px 10px', textAlign: 'center' as const }}>
-                          <input type="checkbox" checked={e.paid} onChange={ev => onSave(key, { paid: ev.target.checked })} style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#16a34a' }} />
+                          <input type="checkbox" checked={e.paid} onChange={ev => onSave(key, { paid: ev.target.checked }, e)} style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#16a34a' }} />
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </>
+              )}
+              {/* Вручную добавленные компании */}
+              {manualCos.length > 0 && (
+                <>
+                  <tr>
+                    <td colSpan={5} style={{ padding: '8px 16px', background: '#f0f9ff', borderTop: '2px solid #bae6fd', borderBottom: '1px solid #bae6fd', fontSize: 11, fontWeight: 700, color: '#0369a1' }}>
+                      Добавлены вручную
+                    </td>
+                  </tr>
+                  {manualCos.map((c, ci) => {
+                    const key = c.id ? `${c.id}|${paySubTab}|${p.q}|${payYear}` : `${c.n}|${paySubTab}|${p.q}|${payYear}`
+                    const e = getPay(c) || { amount: '', comment: '', paid: false }
+                    const hasAmt = parseFloat((e.amount || '').replace(/\s/g, '').replace(',', '.')) > 0
+                    const rowBg = e.paid ? '#f0fdf4' : hasAmt ? '#fff5f5' : '#f0f9ff'
+                    return (
+                      <tr key={'m' + ci} style={{ borderBottom: '1px solid #f3f4f6', background: rowBg }}>
+                        <td style={{ padding: '6px 16px', color: '#374151', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500 }} title={c.n}>
+                          <span>{c.n}</span>
+                          <button onClick={() => c.id && removeManualCo(c.id)} title="Убрать из списка" style={{ marginLeft: 6, background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1 }}>✕</button>
+                        </td>
+                        <td style={{ padding: '6px 10px', color: '#9ca3af', fontSize: 11, whiteSpace: 'nowrap' as const }}>{c.reg}</td>
+                        <td style={{ padding: '4px 10px' }}>
+                          <input type="text" value={fmtAmt(e.amount)} onChange={ev => onSave(key, { amount: fmtAmt(ev.target.value) }, e)} placeholder="0"
+                            style={{ width: 130, fontSize: 13, fontWeight: 600, padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: 6, textAlign: 'right' as const, outline: 'none', background: '#fff', color: '#111827' }} />
+                        </td>
+                        <td style={{ padding: '4px 10px' }}>
+                          <input type="text" value={e.comment} onChange={ev => onSave(key, { comment: ev.target.value }, e)} placeholder="Заметка..."
+                            style={{ width: '100%', minWidth: 160, fontSize: 12, padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: 6, outline: 'none', background: '#fff', color: '#111827' }} />
+                        </td>
+                        <td style={{ padding: '4px 10px', textAlign: 'center' as const }}>
+                          <input type="checkbox" checked={e.paid} onChange={ev => onSave(key, { paid: ev.target.checked }, e)} style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#16a34a' }} />
                         </td>
                       </tr>
                     )
@@ -2444,6 +2511,32 @@ function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYe
               )}
             </tbody>
           </table>
+        </div>
+        {/* Кнопка "Добавить компанию" */}
+        <div style={{ marginTop: 12, position: 'relative' }}>
+          <button onClick={() => { setShowAddCo(v => !v); setAddCoSearch('') }}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: '#f0f9ff', border: '1.5px dashed #7dd3fc', borderRadius: 8, color: '#0369a1', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            + Добавить компанию
+          </button>
+          {showAddCo && (
+            <div style={{ position: 'absolute', top: '110%', left: 0, zIndex: 100, background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', minWidth: 320, padding: 10 }}>
+              <input autoFocus type="text" placeholder="Поиск компании..." value={addCoSearch} onChange={e => setAddCoSearch(e.target.value)}
+                style={{ width: '100%', fontSize: 13, padding: '7px 10px', border: '1.5px solid #d1d5db', borderRadius: 7, outline: 'none', marginBottom: 8, boxSizing: 'border-box' as const }} />
+              <div style={{ maxHeight: 220, overflowY: 'auto' as const }}>
+                {availableFiltered.length === 0 && <div style={{ padding: '10px 6px', color: '#9ca3af', fontSize: 12 }}>Нет доступных компаний</div>}
+                {availableFiltered.map(c => (
+                  <div key={c.id} onClick={() => c.id && addManualCo(c.id)}
+                    style={{ padding: '8px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 13, color: '#374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#f3f4f6')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <span>{c.n}</span>
+                    <span style={{ fontSize: 11, color: '#9ca3af' }}>{c.reg}</span>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => setShowAddCo(false)} style={{ marginTop: 6, width: '100%', padding: '6px', background: '#f3f4f6', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12, color: '#6b7280' }}>Закрыть</button>
+            </div>
+          )}
         </div>
       </div>
     </div>
