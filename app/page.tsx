@@ -123,7 +123,7 @@ function getStatTypes(reg: string): string[] {
   return []
 }
 
-type RepEntry = { co: string; reg: string; type: string; q: string; due: string; months: number[] | null }
+type RepEntry = { co: string; coId?: string; reg: string; type: string; q: string; due: string; months: number[] | null }
 
 function buildReports(companies: Company[], year: number, admin: AdminSettings): { tax: RepEntry[]; stat: RepEntry[] } {
   const QTRS = getQTRS(year)
@@ -141,37 +141,37 @@ function buildReports(companies: Company[], year: number, admin: AdminSettings):
       // Отчёт 200 — только если у компании есть сотрудники (или поле не задано — backward compat)
       if (rep.code.includes('200') && c.hasEmployees === false) continue
       if (rep.period === 'annual') {
-        tax.push({ co: c.n, reg: r, type: rep.code, q: 'Годовой', due: `${ny}-03-31`, months: null })
+        tax.push({ co: c.n, coId: c.id, reg: r, type: rep.code, q: 'Годовой', due: `${ny}-03-31`, months: null })
       } else {
         for (const qt of QTRS) {
           if ((rep.onlyEvenQ || rep.period === 'semi-annual') && !qt.has910) continue
           const showMonths = rep.hasMonths || (rep.code.includes('910') && has200skipped)
-          tax.push({ co: c.n, reg: r, type: rep.code, q: qt.q, due: qt.due200, months: showMonths ? QM[qt.q] : null })
+          tax.push({ co: c.n, coId: c.id, reg: r, type: rep.code, q: qt.q, due: qt.due200, months: showMonths ? QM[qt.q] : null })
         }
       }
     }
     // Если у компании стоит НДС и режим не ОУР(НДС) — добавляем 300.00 квартально
     if (c.nds && r !== 'ОУР (НДС)' && !skip.includes('300.00 (НДС)')) {
       for (const qt of QTRS) {
-        tax.push({ co: c.n, reg: r, type: '300.00 (НДС)', q: qt.q, due: qt.due300, months: null })
+        tax.push({ co: c.n, coId: c.id, reg: r, type: '300.00 (НДС)', q: qt.q, due: qt.due300, months: null })
       }
     }
     for (const rep of (admin.statReports[r] || [])) {
       if (skip.includes(rep.code)) continue
       if (rep.period === 'annual') {
-        stat.push({ co: c.n, reg: r, type: rep.code, q: 'Годовой', due: `${ny}-02-15`, months: null })
+        stat.push({ co: c.n, coId: c.id, reg: r, type: rep.code, q: 'Годовой', due: `${ny}-02-15`, months: null })
       } else if (rep.period === 'monthly') {
         for (const qt of QTRS) {
-          stat.push({ co: c.n, reg: r, type: rep.code + ' (ежемес.)', q: qt.q, due: qt.due200, months: QM[qt.q] })
+          stat.push({ co: c.n, coId: c.id, reg: r, type: rep.code + ' (ежемес.)', q: qt.q, due: qt.due200, months: QM[qt.q] })
         }
       } else if (rep.period === 'semi-annual') {
         for (const qt of QTRS) {
           if (!qt.has910) continue
-          stat.push({ co: c.n, reg: r, type: rep.code, q: qt.q, due: qt.due200, months: null })
+          stat.push({ co: c.n, coId: c.id, reg: r, type: rep.code, q: qt.q, due: qt.due200, months: null })
         }
       } else {
         for (const qt of QTRS) {
-          stat.push({ co: c.n, reg: r, type: rep.code, q: qt.q, due: qt.due200, months: null })
+          stat.push({ co: c.n, coId: c.id, reg: r, type: rep.code, q: qt.q, due: qt.due200, months: null })
         }
       }
     }
@@ -181,13 +181,13 @@ function buildReports(companies: Company[], year: number, admin: AdminSettings):
       const name = parts[0], period = parts[1] || 'annual', repType = parts[2] || 'tax'
       const isStat = repType === 'stat'
       if (period === 'quarterly') {
-        for (const qt of QTRS) { (isStat ? stat : tax).push({ co: c.n, reg: r, type: name, q: qt.q, due: qt.due200, months: null }) }
+        for (const qt of QTRS) { (isStat ? stat : tax).push({ co: c.n, coId: c.id, reg: r, type: name, q: qt.q, due: qt.due200, months: null }) }
       } else if (period === 'semi-annual') {
-        for (const qt of QTRS) { if (!qt.has910) continue; (isStat ? stat : tax).push({ co: c.n, reg: r, type: name, q: qt.q, due: qt.due200, months: null }) }
+        for (const qt of QTRS) { if (!qt.has910) continue; (isStat ? stat : tax).push({ co: c.n, coId: c.id, reg: r, type: name, q: qt.q, due: qt.due200, months: null }) }
       } else if (period === 'monthly') {
-        for (const qt of QTRS) { (isStat ? stat : tax).push({ co: c.n, reg: r, type: name + ' (ежемес.)', q: qt.q, due: qt.due200, months: QM[qt.q] }) }
+        for (const qt of QTRS) { (isStat ? stat : tax).push({ co: c.n, coId: c.id, reg: r, type: name + ' (ежемес.)', q: qt.q, due: qt.due200, months: QM[qt.q] }) }
       } else {
-        (isStat ? stat : tax).push({ co: c.n, reg: r, type: name, q: 'Годовой', due: `${ny}-03-31`, months: null })
+        (isStat ? stat : tax).push({ co: c.n, coId: c.id, reg: r, type: name, q: 'Годовой', due: `${ny}-03-31`, months: null })
       }
     })
   }
@@ -647,14 +647,14 @@ export default function DashboardPage() {
   function markAllTaxPaid() {
     const nd = { ...taxDone }
     const keys: string[] = []
-    taxAct.forEach(c => { const k = taxKey(c.n, taxMonth - 1); nd[k] = true; keys.push(k) })
+    taxAct.forEach(c => { const k = c.id ? taxKey(c.id, taxMonth - 1) : taxKeyName(c.n, taxMonth - 1); nd[k] = true; keys.push(k) })
     saveTaxDone(nd, keys)
     showToast(`Отмечено ${taxAct.length} компаний ✓`)
   }
   function resetAllTaxPaid() {
     const nd = { ...taxDone }
     const keys: string[] = []
-    taxAct.forEach(c => { const k = taxKey(c.n, taxMonth - 1); nd[k] = false; keys.push(k) })
+    taxAct.forEach(c => { const k = c.id ? taxKey(c.id, taxMonth - 1) : taxKeyName(c.n, taxMonth - 1); nd[k] = false; keys.push(k) })
     saveTaxDone(nd, keys)
     showToast(`Сброшено ${taxAct.length} компаний`)
   }
@@ -666,8 +666,8 @@ export default function DashboardPage() {
       'Режим': c.reg,
       'Группа': c.freq,
       'Категория': c.cat,
-      'Статус налога': taxDone[taxKey(c.n, taxMonth - 1)] ? 'Уплачен' : 'Не уплачен',
-      'Комментарий': taxComments[`${c.n}|${taxYear}-${taxMonth - 1}`] || '',
+      'Статус налога': getTax(c, taxMonth - 1) ? 'Уплачен' : 'Не уплачен',
+      'Комментарий': (c.id ? taxComments[`${c.id}|cmt|${taxYear}-${taxMonth - 1}`] : undefined) || taxComments[`${c.n}|cmt|${taxYear}-${taxMonth - 1}`] || '',
     }))
     const ws = XLSX.utils.json_to_sheet(data)
     ws['!cols'] = [{ wch: 40 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 20 }, { wch: 16 }, { wch: 30 }]
@@ -679,9 +679,10 @@ export default function DashboardPage() {
     const list = repSubTab === 'tax' ? taxReps : statReps
     const label = repSubTab === 'tax' ? 'Нал. отчёты' : 'Стат. отчёты'
     const data = list.map(r => {
-      const rk = `${r.co}|${r.type}|${r.q}|${repYear}`
-      const ex = repExtra[rk] || { comment: '', cabinet: false }
-      const done = repDone[rk]
+      const rkId = r.coId ? `${r.coId}|${r.type}|${r.q}|${repYear}` : ''
+      const rkName = `${r.co}|${r.type}|${r.q}|${repYear}`
+      const ex = (r.coId ? repExtra[rkId] : undefined) || repExtra[rkName] || { comment: '', cabinet: false }
+      const done = (r.coId ? repDone[rkId] : undefined) ?? repDone[rkName]
       return {
         'Компания': r.co,
         'Режим': r.reg,
@@ -733,13 +734,12 @@ export default function DashboardPage() {
   }
   function exportPayCSV() {
     const periods = getPayPeriods(paySubTab, payYear)
-    const active = companies.filter(c => c.status === 'Активная')
+    const active = companies.filter(c => c.status === 'Активная' && !c.noReports)
     const list = paySubTab === 'nds' ? active.filter(c => c.nds || c.reg === 'ОУР (НДС)' || c.reg.includes('НДС')) : active
     const rows: Record<string, string>[] = []
     for (const p of periods) {
       for (const c of list) {
-        const key = `${c.n}|${paySubTab}|${p.q}|${payYear}`
-        const e = payEntries[key] || { amount: '', comment: '', paid: false }
+        const e = (c.id ? payEntries[`${c.id}|${paySubTab}|${p.q}|${payYear}`] : undefined) || payEntries[`${c.n}|${paySubTab}|${p.q}|${payYear}`] || { amount: '', comment: '', paid: false }
         rows.push({
           'Квартал': p.q,
           'Срок уплаты': p.due,
@@ -803,28 +803,33 @@ export default function DashboardPage() {
     return true
   })
   const taxAct = taxFreq ? actCos.filter(c => c.freq === taxFreq) : actCos
-  const taxKey = (co: string, m: number) => `${co}|main|${taxYear}-${m}`
+  const taxKey = (coId: string | undefined, m: number) => coId ? `${coId}|main|${taxYear}-${m}` : ''
+  const taxKeyName = (coName: string, m: number) => `${coName}|main|${taxYear}-${m}`
+  const getTax = (c: Company, m: number) => (c.id ? taxDone[taxKey(c.id, m)] : undefined) ?? taxDone[taxKeyName(c.n, m)]
   const stTax = {
     count: taxAct.length,
-    mainPaid: taxAct.filter(c => taxDone[taxKey(c.n, taxMonth - 1)]).length,
+    mainPaid: taxAct.filter(c => getTax(c, taxMonth - 1)).length,
   }
   const taxActFiltered = taxPaidFilter === 'paid'
-    ? taxAct.filter(c => taxDone[taxKey(c.n, taxMonth - 1)])
+    ? taxAct.filter(c => getTax(c, taxMonth - 1))
     : taxPaidFilter === 'unpaid'
-    ? taxAct.filter(c => !taxDone[taxKey(c.n, taxMonth - 1)])
+    ? taxAct.filter(c => !getTax(c, taxMonth - 1))
     : taxAct
   const reps = buildReports(companies, repYear, adminSettings)
   const QLABELS = getQLABELS(repYear)
-  const repKey = (r: RepEntry) => `${r.co}|${r.type}|${r.q}|${repYear}`
+  const repKey = (r: RepEntry) => r.coId ? `${r.coId}|${r.type}|${r.q}|${repYear}` : ''
+  const repKeyName = (r: RepEntry) => `${r.co}|${r.type}|${r.q}|${repYear}`
+  const getRep = (r: RepEntry) => (r.coId ? repDone[repKey(r)] : undefined) ?? repDone[repKeyName(r)]
+  const getRepEx = (r: RepEntry) => (r.coId ? repExtra[repKey(r)] : undefined) ?? repExtra[repKeyName(r)]
   function applyRepFilters(list: RepEntry[]) {
     return list.filter(r => {
       if (repQ && r.q !== repQ) return false
       if (repReg && r.reg !== repReg) return false
       if (repType && !r.type.startsWith(repType + '.')) return false
-      if (repStatus === 'done' && !repDone[repKey(r)]) return false
-      if (repStatus === 'pending' && (repDone[repKey(r)] || repExtra[repKey(r)]?.cabinet)) return false
-      if (repStatus === 'ready' && (repDone[repKey(r)] || !repExtra[repKey(r)]?.cabinet)) return false
-      if (repStatus === 'overdue' && (repDone[repKey(r)] || dl(r.due) >= 0)) return false
+      if (repStatus === 'done' && !getRep(r)) return false
+      if (repStatus === 'pending' && (getRep(r) || getRepEx(r)?.cabinet)) return false
+      if (repStatus === 'ready' && (getRep(r) || !getRepEx(r)?.cabinet)) return false
+      if (repStatus === 'overdue' && (getRep(r) || dl(r.due) >= 0)) return false
       if (repSearch && !r.co.toLowerCase().includes(repSearch.toLowerCase())) return false
       return true
     })
@@ -841,10 +846,10 @@ export default function DashboardPage() {
   )
   const stRep = {
     taxTotal: taxReps.length,
-    taxDone: taxReps.filter(r => repDone[repKey(r)]).length,
+    taxDone: taxReps.filter(r => getRep(r)).length,
     statTotal: statReps.length,
-    statDone: statReps.filter(r => repDone[repKey(r)]).length,
-    overdue: taxReps.filter(r => !repDone[repKey(r)] && dl(r.due) < 0).length,
+    statDone: statReps.filter(r => getRep(r)).length,
+    overdue: taxReps.filter(r => !getRep(r) && dl(r.due) < 0).length,
   }
 
   if (status === 'loading') return <div className="loading">Загрузка...</div>
@@ -1309,6 +1314,7 @@ export default function DashboardPage() {
           onSubTabChange={setPaySubTab}
           onSearchChange={setPaySearch}
           onSave={savePayEntry}
+          adminSettings={adminSettings}
         />
       </div>
 
@@ -1373,8 +1379,8 @@ export default function DashboardPage() {
               <h3>Редактировать компанию</h3>
               <button className="modal-close" onClick={() => { setEditCoIdx(-1); setEditCoData(null) }}>×</button>
             </div>
-            <div className="fg"><label>Наименование</label>
-              <input type="text" value={editCoData.n} onChange={e => setEditCoData(p => p ? { ...p, n: e.target.value } : p)} />
+            <div className="fg"><label>Наименование {!isAdmin && <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 400 }}>(только для администратора)</span>}</label>
+              <input type="text" value={editCoData.n} onChange={e => setEditCoData(p => p ? { ...p, n: e.target.value } : p)} readOnly={!isAdmin} style={!isAdmin ? { background: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' } : undefined} />
             </div>
             <div className="fg"><label>БИН / ИИН</label>
               <input type="text" placeholder="123456789012" maxLength={12} value={editCoData.bin || ''} onChange={e => setEditCoData(p => p ? { ...p, bin: e.target.value } : p)} style={{ fontFamily: 'monospace', letterSpacing: 1 }} />
@@ -1523,7 +1529,8 @@ function TaxSection({ companies, taxDone, taxMonth, taxYear, taxFreq, onToggle, 
   const MN = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
   const prevMonth = taxMonth === 1 ? 12 : taxMonth - 1
   const prevYear = taxMonth === 1 ? taxYear - 1 : taxYear
-  const mk = (co: string) => `${co}|main|${taxYear}-${taxMonth - 1}`
+  const mk = (c: Company) => c.id ? `${c.id}|main|${taxYear}-${taxMonth - 1}` : ''
+  const mkOld = (c: Company) => `${c.n}|main|${taxYear}-${taxMonth - 1}`
   const grps = [
     { label: 'Ежедневные', freq: 'Ежедневная', color: '#1d4ed8', bg: '#eff6ff' },
     { label: 'Раз в месяц', freq: 'Раз в месяц', color: '#065f46', bg: '#d1fae5' },
@@ -1540,7 +1547,7 @@ function TaxSection({ companies, taxDone, taxMonth, taxYear, taxFreq, onToggle, 
         if (taxFreq && taxFreq !== g.freq) return null
         const rows = companies.filter(c => c.freq === g.freq)
         if (!rows.length) return null
-        const dn = rows.filter(c => taxDone[mk(c.n)]).length
+        const dn = rows.filter(c => (taxDone[mk(c)] ?? taxDone[mkOld(c)])).length
         return (
           <div key={g.freq} className="tgrp">
             <div className="tgrp-t">
@@ -1550,10 +1557,11 @@ function TaxSection({ companies, taxDone, taxMonth, taxYear, taxFreq, onToggle, 
               <span style={{ color: '#94a3b8', fontWeight: 400 }}>· до 25 {MN[taxMonth]}</span>
             </div>
             {rows.map(c => {
-              const key = mk(c.n)
-              const done = taxDone[key]
-              const cmtKey = `${c.n}|cmt|${taxYear}-${taxMonth - 1}`
-              const cmt = taxComments[cmtKey] || ''
+              const key = mk(c) || mkOld(c)
+              const done = (c.id ? taxDone[mk(c)] : undefined) ?? taxDone[mkOld(c)]
+              const cmtKey = c.id ? `${c.id}|cmt|${taxYear}-${taxMonth - 1}` : ''
+              const cmtKeyOld = `${c.n}|cmt|${taxYear}-${taxMonth - 1}`
+              const cmt = (c.id ? taxComments[cmtKey] : undefined) || taxComments[cmtKeyOld] || ''
               return (
                 <div key={c.n} className="trow" style={{ flexWrap: 'wrap' as const, gap: 4 }}>
                   <input type="checkbox" className="chk" checked={!!done} onChange={() => onToggle(key)} />
@@ -1563,7 +1571,7 @@ function TaxSection({ companies, taxDone, taxMonth, taxYear, taxFreq, onToggle, 
                   <span className={`b ${done ? 'bg' : 'ba'}`} style={{ marginLeft: 'auto' }}>{done ? 'уплачен' : 'до 25-го'}</span>
                   <input
                     type="text" value={cmt}
-                    onChange={e => onComment(cmtKey, e.target.value)}
+                    onChange={e => { onComment(cmtKey || cmtKeyOld, e.target.value) }}
                     placeholder="Комментарий (блок счёта, нет денег...)"
                     style={{ width: '100%', fontSize: 11, padding: '3px 8px', border: '1px solid #e2e8f0', borderRadius: 5, color: '#b45309', background: cmt ? '#fffbeb' : '#f8fafc', marginTop: 2 }}
                   />
@@ -1592,15 +1600,20 @@ function ReportsSection({ reports, repDone, taxDone, repYear, repQ, repReg, repS
     return Math.round((x.getTime() - today.getTime()) / 86400000)
   }
 
-  const rKey = (r: RepEntry) => `${r.co}|${r.type}|${r.q}|${repYear}`
-  const mKey = (co: string, m: number) => `${co}|main|${repYear}-${m}`
+  const rKey = (r: RepEntry) => r.coId ? `${r.coId}|${r.type}|${r.q}|${repYear}` : ''
+  const rKeyOld = (r: RepEntry) => `${r.co}|${r.type}|${r.q}|${repYear}`
+  const mKey = (r: RepEntry, m: number) => r.coId ? `${r.coId}|main|${repYear}-${m}` : ''
+  const mKeyOld = (r: RepEntry, m: number) => `${r.co}|main|${repYear}-${m}`
+  const isDone = (r: RepEntry) => (r.coId ? repDone[rKey(r)] : undefined) ?? repDone[rKeyOld(r)]
+  const isExtra = (r: RepEntry) => (r.coId ? repExtra[rKey(r)] : undefined) ?? repExtra[rKeyOld(r)]
+  const isTaxM = (r: RepEntry, m: number) => (r.coId ? taxDone[mKey(r, m)] : undefined) ?? taxDone[mKeyOld(r, m)]
   const list = reports.filter(r => {
     if (repReg && r.reg !== repReg) return false
     if (repQ && r.q !== repQ) return false
     if (repType && !r.type.startsWith(repType + '.')) return false
-    if (repStatus === 'done' && !repDone[rKey(r)]) return false
-    if (repStatus === 'pending' && (repDone[rKey(r)] || repExtra[rKey(r)]?.cabinet)) return false
-    if (repStatus === 'ready' && (repDone[rKey(r)] || !repExtra[rKey(r)]?.cabinet)) return false
+    if (repStatus === 'done' && !isDone(r)) return false
+    if (repStatus === 'pending' && (isDone(r) || isExtra(r)?.cabinet)) return false
+    if (repStatus === 'ready' && (isDone(r) || !isExtra(r)?.cabinet)) return false
     if (repSearch && !r.co.toLowerCase().includes(repSearch.toLowerCase())) return false
     return true
   })
@@ -1614,7 +1627,7 @@ function ReportsSection({ reports, repDone, taxDone, repYear, repQ, repReg, repS
         if (!items?.length) return null
         const months = QM[qKey] || []
         const tot = items.length
-        const dn = items.filter(r => repDone[rKey(r)]).length
+        const dn = items.filter(r => isDone(r)).length
         const has910 = items.some(r => r.type.includes('910'))
         return (
           <div key={qKey} className="q-block">
@@ -1641,13 +1654,13 @@ function ReportsSection({ reports, repDone, taxDone, repYear, repQ, repReg, repS
                 </thead>
                 <tbody>
                   {items.map((r, i) => {
-                    const rowKey = rKey(r)
-                    const done = repDone[rowKey]
+                    const rowKey = r.coId ? rKey(r) : rKeyOld(r)
+                    const done = isDone(r)
                     const d = dlLocal(r.due)
                     const dt = done ? '✓ сдан' : d < 0 ? `просроч.${Math.abs(d)}д` : `${d} дн.`
                     const tc = r.type.includes('910') ? 'bt' : r.type.includes('300') ? 'br' : r.type.includes('200') ? 'bp' : 'ba'
                     const sk = done ? { textDecoration: 'line-through' as const, color: '#b4b2a9' } : {}
-                    const extra = repExtra[rowKey] || { comment: '', cabinet: false }
+                    const extra = isExtra(r) || { comment: '', cabinet: false }
                     return (
                       <tr key={i}>
                         <td style={{ fontWeight: 500, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', ...sk }} title={`${r.co} — нажмите для редактирования`}>
@@ -1690,8 +1703,8 @@ function ReportsSection({ reports, repDone, taxDone, repYear, repQ, repReg, repS
                         </td>
                         {months.map(m => {
                           if (!r.months) return <td key={m} className="center"><span style={{ color: '#b4b2a9', fontSize: 10 }}>—</span></td>
-                          const cellKey = mKey(r.co, m)
-                          const paid = taxDone[cellKey]
+                          const cellKey = r.coId ? mKey(r, m) : mKeyOld(r, m)
+                          const paid = isTaxM(r, m)
                           return (
                             <td key={m} className="center">
                               <div className={`tax-cell ${paid ? 'tax-paid' : 'tax-unpaid'}`} style={{ minWidth: 0, fontSize: 9.5 }} onClick={() => onToggleMonthTax(cellKey)}>
@@ -1850,6 +1863,24 @@ function AdminSection({ adminSettings, onSave }: { adminSettings: AdminSettings;
   const [migrNew, setMigrNew] = useState('')
   const [migrMsg, setMigrMsg] = useState('')
   const [migrLoading, setMigrLoading] = useState(false)
+  const [migrIdMsg, setMigrIdMsg] = useState('')
+  const [migrIdLoading, setMigrIdLoading] = useState(false)
+
+  async function migrateAllToIds() {
+    setMigrIdLoading(true); setMigrIdMsg('')
+    try {
+      const res = await fetch('/api/migrate-to-ids', { method: 'POST' })
+      const d = await res.json()
+      if (res.ok && d.ok) {
+        setMigrIdMsg(`✓ Миграция завершена: обновлено ${d.migrated} записей (${d.companies} компаний)`)
+      } else {
+        setMigrIdMsg('Ошибка: ' + (d.error || 'неизвестная ошибка'))
+      }
+    } catch {
+      setMigrIdMsg('Ошибка сети — проверьте соединение')
+    }
+    setMigrIdLoading(false)
+  }
 
   async function migrateKeys() {
     if (!migrOld.trim() || !migrNew.trim()) { setMigrMsg('Заполните оба поля'); return }
@@ -2135,6 +2166,23 @@ function AdminSection({ adminSettings, onSave }: { adminSettings: AdminSettings;
       {sub === 'migrate' && (
         <div style={{ maxWidth: 680 }}>
           <div style={{ background: '#fff', borderRadius: 14, padding: 24, boxShadow: '0 2px 8px rgba(99,102,241,.08)', marginBottom: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginBottom: 8 }}>🔑 Переход на стабильные ID компаний</div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 16, lineHeight: 1.6 }}>
+              Переносит все данные (налоги, отчёты, суммы, комментарии) с ключей по <strong>названию компании</strong> на <strong>уникальный ID</strong>. После этого переименование компании больше не потеряет данные. Запустите один раз.
+            </div>
+            <button onClick={migrateAllToIds} disabled={migrIdLoading}
+              style={{ padding: '11px 20px', background: migrIdLoading ? '#9ca3af' : '#0f766e', color: '#fff', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: migrIdLoading ? 'not-allowed' : 'pointer' }}>
+              {migrIdLoading ? '⏳ Выполняется...' : '🔑 Мигрировать все данные на ID'}
+            </button>
+            {migrIdMsg && (
+              <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                background: migrIdMsg.startsWith('✓') ? '#dcfce7' : '#fee2e2',
+                color: migrIdMsg.startsWith('✓') ? '#166534' : '#991b1b' }}>
+                {migrIdMsg}
+              </div>
+            )}
+          </div>
+          <div style={{ background: '#fff', borderRadius: 14, padding: 24, boxShadow: '0 2px 8px rgba(99,102,241,.08)', marginBottom: 16 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginBottom: 8 }}>🔧 Восстановление данных при переименовании</div>
             <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 20, lineHeight: 1.6 }}>
               Если вы переименовали компанию и данные (отчёты, налоги, суммы, комментарии) пропали — введите старое и новое название. Все данные будут перенесены на новое название.
@@ -2193,14 +2241,14 @@ function getPayPeriods(type: 'kpn' | 'nds', year: number) {
     ]
   }
   return [
-    { q: '1 квартал', label: `1 квартал (янв–март ${year})`, due: `${year}-04-25`, dueLabel: `25 апреля ${year}` },
-    { q: '2 квартал', label: `2 квартал (апр–июнь ${year})`, due: `${year}-07-25`, dueLabel: `25 июля ${year}` },
-    { q: '3 квартал', label: `3 квартал (июль–сент ${year})`, due: `${year}-10-25`, dueLabel: `25 октября ${year}` },
-    { q: '4 квартал', label: `4 квартал (окт–дек ${year})`, due: `${year + 1}-01-25`, dueLabel: `25 января ${year + 1}` },
+    { q: '1 квартал', label: `1 квартал (янв–март ${year})`, due: `${year}-05-25`, dueLabel: `25 мая ${year}` },
+    { q: '2 квартал', label: `2 квартал (апр–июнь ${year})`, due: `${year}-08-25`, dueLabel: `25 августа ${year}` },
+    { q: '3 квартал', label: `3 квартал (июль–сент ${year})`, due: `${year}-11-25`, dueLabel: `25 ноября ${year}` },
+    { q: '4 квартал', label: `4 квартал (окт–дек ${year})`, due: `${year + 1}-02-25`, dueLabel: `25 февраля ${year + 1}` },
   ]
 }
 
-function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYearChange, onSubTabChange, onSearchChange, onSave }: {
+function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYearChange, onSubTabChange, onSearchChange, onSave, adminSettings }: {
   companies: Company[]
   payEntries: Record<string, PayEntry>
   payYear: number
@@ -2210,32 +2258,45 @@ function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYe
   onSubTabChange: (t: 'kpn' | 'nds') => void
   onSearchChange: (s: string) => void
   onSave: (key: string, patch: Partial<PayEntry>) => void
+  adminSettings: AdminSettings
 }) {
   const [selQ, setSelQ] = useState('2 квартал')
   const [paidFilter, setPaidFilter] = useState<'' | 'paid' | 'unpaid'>('')
-  const active = companies.filter(c => c.status === 'Активная')
+  const active = companies.filter(c => c.status === 'Активная' && !c.noReports)
   const base = paySubTab === 'nds' ? active.filter(c => c.nds || c.reg === 'ОУР (НДС)' || c.reg.includes('НДС')) : active
   const list = paySearch ? base.filter(c => c.n.toLowerCase().includes(paySearch.toLowerCase())) : base
   const periods = getPayPeriods(paySubTab, payYear)
   const p = periods.find(x => x.q === selQ) || periods[0]
 
-  const fmt = (n: number) => n > 0 ? n.toLocaleString('ru-RU') : '—'
+  // Компании на ОУР подают 100 ФНО — годовые плательщики КПН (только в 4 квартале, срок 31 марта)
+  const isAnnual = (c: Company) => paySubTab === 'kpn' && c.reg.includes('ОУР')
+  const isQ4 = selQ === '4 квартал'
+  // Для Q1/Q2/Q3 скрываем годовых, для Q4 показываем всех
+  const visibleList = (paySubTab === 'kpn' && !isQ4) ? list.filter(c => !isAnnual(c)) : list
 
-  // Статистика по выбранному кварталу
+  const fmt = (n: number) => n > 0 ? n.toLocaleString('ru-RU') : '—'
+  const getPay = (c: Company) => (c.id ? payEntries[`${c.id}|${paySubTab}|${p.q}|${payYear}`] : undefined) || payEntries[`${c.n}|${paySubTab}|${p.q}|${payYear}`]
+
+  // Статистика по видимым компаниям
   let totalSum = 0, paidSum = 0, paidCount = 0, unpaidCount = 0
-  list.forEach(c => {
-    const key = `${c.n}|${paySubTab}|${p.q}|${payYear}`
-    const e = payEntries[key]
-    const amt = e ? parseFloat(e.amount.replace(/\s/g, '').replace(',', '.')) || 0 : 0
+  visibleList.forEach(c => {
+    const e = getPay(c)
+    const amt = e ? parseFloat((e.amount || '').replace(/\s/g, '').replace(',', '.')) || 0 : 0
     totalSum += amt
     if (e?.paid) { paidSum += amt; paidCount++ } else { unpaidCount++ }
   })
   const unpaidSum = totalSum - paidSum
-  const displayList = paidFilter === 'paid'
-    ? list.filter(c => payEntries[`${c.n}|${paySubTab}|${p.q}|${payYear}`]?.paid)
+
+  const filteredList = paidFilter === 'paid'
+    ? visibleList.filter(c => getPay(c)?.paid)
     : paidFilter === 'unpaid'
-    ? list.filter(c => !payEntries[`${c.n}|${paySubTab}|${p.q}|${payYear}`]?.paid)
-    : list
+    ? visibleList.filter(c => !getPay(c)?.paid)
+    : visibleList
+
+  // В Q4 разделяем: квартальные и годовые (100 ФНО)
+  const filteredQ = filteredList.filter(c => !isAnnual(c))
+  const filteredA = filteredList.filter(c => isAnnual(c))
+  const annualDueLabel = `31 марта ${payYear + 1}`
 
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const dueDate = new Date(p.due); dueDate.setHours(0, 0, 0, 0)
@@ -2272,7 +2333,7 @@ function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYe
       <div className="srow" style={{ marginBottom: 16 }}>
         <div className="stat s-indigo" style={{ cursor: 'pointer' }} onClick={() => setPaidFilter('')}>
           <div className="sl">Компаний</div>
-          <div className="sv">{list.length}</div>
+          <div className="sv">{visibleList.length}</div>
         </div>
         <div className="stat s-green" style={{ cursor: 'pointer', ...(paidFilter === 'paid' ? { outline: '2px solid #16a34a', outlineOffset: -2 } : {}) }} onClick={() => setPaidFilter(f => f === 'paid' ? '' : 'paid')}>
           <div className="sl">Уплачено {paidFilter === 'paid' ? '▼' : ''}</div>
@@ -2324,46 +2385,63 @@ function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYe
               </tr>
             </thead>
             <tbody>
-              {displayList.map((c, ci) => {
-                const key = `${c.n}|${paySubTab}|${p.q}|${payYear}`
-                const e = payEntries[key] || { amount: '', comment: '', paid: false }
+              {/* Квартальные плательщики */}
+              {filteredQ.map((c, ci) => {
+                const key = c.id ? `${c.id}|${paySubTab}|${p.q}|${payYear}` : `${c.n}|${paySubTab}|${p.q}|${payYear}`
+                const e = getPay(c) || { amount: '', comment: '', paid: false }
                 const hasAmt = parseFloat((e.amount || '').replace(/\s/g, '').replace(',', '.')) > 0
                 const rowBg = e.paid ? '#f0fdf4' : hasAmt ? '#fff5f5' : '#ffffff'
                 return (
                   <tr key={ci} style={{ borderBottom: '1px solid #f3f4f6', background: rowBg }}>
-                    <td style={{ padding: '6px 16px', color: '#374151', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500 }} title={c.n}>
-                      {c.n}
-                    </td>
+                    <td style={{ padding: '6px 16px', color: '#374151', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500 }} title={c.n}>{c.n}</td>
                     <td style={{ padding: '6px 10px', color: '#9ca3af', fontSize: 11, whiteSpace: 'nowrap' as const }}>{c.reg}</td>
                     <td style={{ padding: '4px 10px' }}>
-                      <input
-                        type="text"
-                        value={fmtAmt(e.amount)}
-                        onChange={ev => onSave(key, { amount: fmtAmt(ev.target.value) })}
-                        placeholder="0"
-                        style={{ width: 130, fontSize: 13, fontWeight: 600, padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: 6, textAlign: 'right' as const, outline: 'none', background: '#fff', color: '#111827' }}
-                      />
+                      <input type="text" value={fmtAmt(e.amount)} onChange={ev => onSave(key, { amount: fmtAmt(ev.target.value) })} placeholder="0"
+                        style={{ width: 130, fontSize: 13, fontWeight: 600, padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: 6, textAlign: 'right' as const, outline: 'none', background: '#fff', color: '#111827' }} />
                     </td>
                     <td style={{ padding: '4px 10px' }}>
-                      <input
-                        type="text"
-                        value={e.comment}
-                        onChange={ev => onSave(key, { comment: ev.target.value })}
-                        placeholder="Заметка..."
-                        style={{ width: '100%', minWidth: 160, fontSize: 12, padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: 6, outline: 'none', background: '#fff', color: '#111827' }}
-                      />
+                      <input type="text" value={e.comment} onChange={ev => onSave(key, { comment: ev.target.value })} placeholder="Заметка..."
+                        style={{ width: '100%', minWidth: 160, fontSize: 12, padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: 6, outline: 'none', background: '#fff', color: '#111827' }} />
                     </td>
                     <td style={{ padding: '4px 10px', textAlign: 'center' as const }}>
-                      <input
-                        type="checkbox"
-                        checked={e.paid}
-                        onChange={ev => onSave(key, { paid: ev.target.checked })}
-                        style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#16a34a' }}
-                      />
+                      <input type="checkbox" checked={e.paid} onChange={ev => onSave(key, { paid: ev.target.checked })} style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#16a34a' }} />
                     </td>
                   </tr>
                 )
               })}
+              {/* Годовые плательщики 100 ФНО — только в 4 квартале */}
+              {isQ4 && filteredA.length > 0 && (
+                <>
+                  <tr>
+                    <td colSpan={5} style={{ padding: '8px 16px', background: '#fef9f0', borderTop: '2px solid #fde68a', borderBottom: '1px solid #fde68a', fontSize: 11, fontWeight: 700, color: '#92400e' }}>
+                      100 ФНО — Годовые плательщики КПН · до {annualDueLabel}
+                    </td>
+                  </tr>
+                  {filteredA.map((c, ci) => {
+                    const key = c.id ? `${c.id}|${paySubTab}|${p.q}|${payYear}` : `${c.n}|${paySubTab}|${p.q}|${payYear}`
+                    const e = getPay(c) || { amount: '', comment: '', paid: false }
+                    const hasAmt = parseFloat((e.amount || '').replace(/\s/g, '').replace(',', '.')) > 0
+                    const rowBg = e.paid ? '#f0fdf4' : hasAmt ? '#fff5f5' : '#fffbeb'
+                    return (
+                      <tr key={'a' + ci} style={{ borderBottom: '1px solid #f3f4f6', background: rowBg }}>
+                        <td style={{ padding: '6px 16px', color: '#374151', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500 }} title={c.n}>{c.n}</td>
+                        <td style={{ padding: '6px 10px', color: '#9ca3af', fontSize: 11, whiteSpace: 'nowrap' as const }}>{c.reg}</td>
+                        <td style={{ padding: '4px 10px' }}>
+                          <input type="text" value={fmtAmt(e.amount)} onChange={ev => onSave(key, { amount: fmtAmt(ev.target.value) })} placeholder="0"
+                            style={{ width: 130, fontSize: 13, fontWeight: 600, padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: 6, textAlign: 'right' as const, outline: 'none', background: '#fff', color: '#111827' }} />
+                        </td>
+                        <td style={{ padding: '4px 10px' }}>
+                          <input type="text" value={e.comment} onChange={ev => onSave(key, { comment: ev.target.value })} placeholder="Заметка..."
+                            style={{ width: '100%', minWidth: 160, fontSize: 12, padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: 6, outline: 'none', background: '#fff', color: '#111827' }} />
+                        </td>
+                        <td style={{ padding: '4px 10px', textAlign: 'center' as const }}>
+                          <input type="checkbox" checked={e.paid} onChange={ev => onSave(key, { paid: ev.target.checked })} style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#16a34a' }} />
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </>
+              )}
             </tbody>
           </table>
         </div>
