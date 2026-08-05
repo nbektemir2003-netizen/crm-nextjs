@@ -2395,12 +2395,40 @@ function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYe
             <div style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>{p.q}</div>
             <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{p.label}</div>
           </div>
-          <div style={{ textAlign: 'right' as const }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: isOverdue ? '#dc2626' : isSoon ? '#d97706' : '#374151' }}>
-              Срок уплаты: {p.dueLabel}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ textAlign: 'right' as const }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: isOverdue ? '#dc2626' : isSoon ? '#d97706' : '#374151' }}>
+                Срок уплаты: {p.dueLabel}
+              </div>
+              {isOverdue && <div style={{ fontSize: 11, color: '#dc2626', marginTop: 2 }}>Просрочено на {Math.abs(daysLeft)} дн.</div>}
+              {isSoon && !isOverdue && <div style={{ fontSize: 11, color: '#d97706', marginTop: 2 }}>Осталось {daysLeft} дн.</div>}
             </div>
-            {isOverdue && <div style={{ fontSize: 11, color: '#dc2626', marginTop: 2 }}>Просрочено на {Math.abs(daysLeft)} дн.</div>}
-            {isSoon && !isOverdue && <div style={{ fontSize: 11, color: '#d97706', marginTop: 2 }}>Осталось {daysLeft} дн.</div>}
+            {/* Кнопка "Добавить компанию" */}
+            <div style={{ position: 'relative' }}>
+              <button onClick={() => { setShowAddCo(v => !v); setAddCoSearch('') }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: '#f0f9ff', border: '1.5px dashed #7dd3fc', borderRadius: 8, color: '#0369a1', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' as const }}>
+                + Добавить компанию
+              </button>
+              {showAddCo && (
+                <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 100, background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', minWidth: 320, padding: 10 }}>
+                  <input autoFocus type="text" placeholder="Поиск компании..." value={addCoSearch} onChange={e => setAddCoSearch(e.target.value)}
+                    style={{ width: '100%', fontSize: 13, padding: '7px 10px', border: '1.5px solid #d1d5db', borderRadius: 7, outline: 'none', marginBottom: 8, boxSizing: 'border-box' as const }} />
+                  <div style={{ maxHeight: 220, overflowY: 'auto' as const }}>
+                    {availableFiltered.length === 0 && <div style={{ padding: '10px 6px', color: '#9ca3af', fontSize: 12 }}>Нет доступных компаний</div>}
+                    {availableFiltered.map(c => (
+                      <div key={c.id} onClick={() => c.id && addManualCo(c.id)}
+                        style={{ padding: '8px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 13, color: '#374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#f3f4f6')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                        <span>{c.n}</span>
+                        <span style={{ fontSize: 11, color: '#9ca3af' }}>{c.reg}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={() => setShowAddCo(false)} style={{ marginTop: 6, width: '100%', padding: '6px', background: '#f3f4f6', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12, color: '#6b7280' }}>Закрыть</button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -2511,32 +2539,6 @@ function PaySection({ companies, payEntries, payYear, paySubTab, paySearch, onYe
               )}
             </tbody>
           </table>
-        </div>
-        {/* Кнопка "Добавить компанию" */}
-        <div style={{ marginTop: 12, position: 'relative' }}>
-          <button onClick={() => { setShowAddCo(v => !v); setAddCoSearch('') }}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: '#f0f9ff', border: '1.5px dashed #7dd3fc', borderRadius: 8, color: '#0369a1', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-            + Добавить компанию
-          </button>
-          {showAddCo && (
-            <div style={{ position: 'absolute', top: '110%', left: 0, zIndex: 100, background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', minWidth: 320, padding: 10 }}>
-              <input autoFocus type="text" placeholder="Поиск компании..." value={addCoSearch} onChange={e => setAddCoSearch(e.target.value)}
-                style={{ width: '100%', fontSize: 13, padding: '7px 10px', border: '1.5px solid #d1d5db', borderRadius: 7, outline: 'none', marginBottom: 8, boxSizing: 'border-box' as const }} />
-              <div style={{ maxHeight: 220, overflowY: 'auto' as const }}>
-                {availableFiltered.length === 0 && <div style={{ padding: '10px 6px', color: '#9ca3af', fontSize: 12 }}>Нет доступных компаний</div>}
-                {availableFiltered.map(c => (
-                  <div key={c.id} onClick={() => c.id && addManualCo(c.id)}
-                    style={{ padding: '8px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 13, color: '#374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#f3f4f6')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                    <span>{c.n}</span>
-                    <span style={{ fontSize: 11, color: '#9ca3af' }}>{c.reg}</span>
-                  </div>
-                ))}
-              </div>
-              <button onClick={() => setShowAddCo(false)} style={{ marginTop: 6, width: '100%', padding: '6px', background: '#f3f4f6', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12, color: '#6b7280' }}>Закрыть</button>
-            </div>
-          )}
         </div>
       </div>
     </div>
