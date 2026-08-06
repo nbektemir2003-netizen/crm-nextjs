@@ -222,6 +222,7 @@ export default function DashboardPage() {
   const [taskEmp, setTaskEmp] = useState('')
   const [taskPrio, setTaskPrio] = useState('')
   const [taskStat, setTaskStat] = useState('')
+  const [taskDeadline, setTaskDeadline] = useState('')
 
   // Фильтры налогов
   const [taxYear, setTaxYear] = useState(2026)
@@ -590,6 +591,13 @@ export default function DashboardPage() {
     if (taskEmp && t.emp !== taskEmp) return false
     if (taskPrio && t.prio !== taskPrio) return false
     if (taskStat && t.st !== taskStat) return false
+    if (taskDeadline) {
+      const d = t.date ? dl(t.date) : null
+      if (taskDeadline === 'overdue' && !(d !== null && d < 0)) return false
+      if (taskDeadline === 'today' && d !== 0) return false
+      if (taskDeadline === 'week' && !(d !== null && d > 0 && d <= 7)) return false
+      if (taskDeadline === 'later' && !(d !== null && d > 7)) return false
+    }
     return true
   })
 
@@ -1060,6 +1068,13 @@ export default function DashboardPage() {
           <select value={taskStat} onChange={e => setTaskStat(e.target.value)}>
             <option value="">Все статусы</option>
             <option>В работе</option><option>Выполнено</option>
+          </select>
+          <select value={taskDeadline} onChange={e => setTaskDeadline(e.target.value)}>
+            <option value="">Все сроки</option>
+            <option value="overdue">Просрочено</option>
+            <option value="today">Сегодня</option>
+            <option value="week">На этой неделе</option>
+            <option value="later">Позже</option>
           </select>
           <button className="btn-sm" onClick={exportTasksCSV} style={{ background: '#fff', color: '#6366f1', border: '1px solid #c7d2fe', whiteSpace: 'nowrap' }}>⬇ Excel</button>
         </div>
