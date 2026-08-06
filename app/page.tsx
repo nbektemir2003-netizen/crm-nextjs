@@ -1048,12 +1048,24 @@ export default function DashboardPage() {
       <div className={`crm-sec${tab === 'tasks' ? ' active' : ''}`}>
         {!isAdmin && <div className="ibox">Показаны только ваши задачи. Задачи других сотрудников видит только администратор.</div>}
         <div className="srow">
-          <div className="stat s-indigo"><div className="sl">Всего</div><div className="sv">{stTasks.total}</div></div>
-          <div className="stat s-sky"><div className="sl">В работе</div><div className="sv amber">{stTasks.active}</div></div>
-          <div className="stat s-green"><div className="sl">Выполнено</div><div className="sv green">{stTasks.done}</div></div>
-          <div className="stat s-red"><div className="sl">Критично</div><div className="sv red">{stTasks.critical}</div></div>
-          <div className="stat s-amber"><div className="sl">Срочно</div><div className="sv amber">{stTasks.urgent}</div></div>
-          <div className="stat s-red"><div className="sl">Просрочено</div><div className="sv red">{stTasks.overdue}</div></div>
+          <div className="stat s-indigo" style={{ cursor: 'pointer' }} onClick={() => { setTaskStat(''); setTaskPrio(''); setTaskDeadline('') }}>
+            <div className="sl">Всего</div><div className="sv">{stTasks.total}</div>
+          </div>
+          <div className="stat s-sky" style={{ cursor: 'pointer', ...(taskStat === 'В работе' ? { outline: '2px solid #0ea5e9', outlineOffset: -2 } : {}) }} onClick={() => setTaskStat(f => f === 'В работе' ? '' : 'В работе')}>
+            <div className="sl">В работе {taskStat === 'В работе' ? '▼' : ''}</div><div className="sv amber">{stTasks.active}</div>
+          </div>
+          <div className="stat s-green" style={{ cursor: 'pointer', ...(taskStat === 'Выполнено' ? { outline: '2px solid #22c55e', outlineOffset: -2 } : {}) }} onClick={() => setTaskStat(f => f === 'Выполнено' ? '' : 'Выполнено')}>
+            <div className="sl">Выполнено {taskStat === 'Выполнено' ? '▼' : ''}</div><div className="sv green">{stTasks.done}</div>
+          </div>
+          <div className="stat s-red" style={{ cursor: 'pointer', ...(taskPrio === 'Критично' ? { outline: '2px solid #ef4444', outlineOffset: -2 } : {}) }} onClick={() => setTaskPrio(f => f === 'Критично' ? '' : 'Критично')}>
+            <div className="sl">Критично {taskPrio === 'Критично' ? '▼' : ''}</div><div className="sv red">{stTasks.critical}</div>
+          </div>
+          <div className="stat s-amber" style={{ cursor: 'pointer', ...(taskPrio === 'Срочно' ? { outline: '2px solid #f59e0b', outlineOffset: -2 } : {}) }} onClick={() => setTaskPrio(f => f === 'Срочно' ? '' : 'Срочно')}>
+            <div className="sl">Срочно {taskPrio === 'Срочно' ? '▼' : ''}</div><div className="sv amber">{stTasks.urgent}</div>
+          </div>
+          <div className="stat s-red" style={{ cursor: 'pointer', ...(taskDeadline === 'overdue' ? { outline: '2px solid #ef4444', outlineOffset: -2 } : {}) }} onClick={() => setTaskDeadline(f => f === 'overdue' ? '' : 'overdue')}>
+            <div className="sl">Просрочено {taskDeadline === 'overdue' ? '▼' : ''}</div><div className="sv red">{stTasks.overdue}</div>
+          </div>
         </div>
         <div className="ff">
           <input type="text" placeholder="Поиск..." value={taskQ} onChange={e => setTaskQ(e.target.value)} />
