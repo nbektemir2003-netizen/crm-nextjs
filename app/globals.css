@@ -123,6 +123,18 @@ tr:hover td{background:#fafafa}
 .dp-today-btn{font-size:11px;color:#6366f1;background:none;border:none;cursor:pointer;font-weight:600}
 .dp-clear-btn{font-size:11px;color:#9ca3af;background:none;border:none;cursor:pointer}
 
+/* ── COMPANY SELECT ── */
+.cs-wrap{position:relative;width:100%}
+.cs-pop{position:absolute;top:calc(100% + 6px);left:0;z-index:300;background:#fff;border-radius:14px;box-shadow:0 12px 32px rgba(17,24,39,.18);padding:8px;width:min(320px,90vw);max-height:340px;overflow-y:auto}
+.cs-group{margin-bottom:2px}
+.cs-cat{font-size:10.5px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:8px 10px 4px}
+.cs-cat-click{cursor:pointer;border-radius:8px;color:#6366f1}
+.cs-cat-click:hover{background:#f5f3ff;color:#4f46e5}
+.cs-item{font-size:12.5px;padding:7px 10px;border-radius:8px;cursor:pointer;color:#111827}
+.cs-item:hover{background:#f5f3ff}
+.cs-item.cs-bulk{font-weight:600;color:#6366f1;border-bottom:1px solid #f3f4f6;border-radius:0;margin-bottom:4px;padding-bottom:9px}
+.cs-item.cs-sel,.cs-cat.cs-sel{background:linear-gradient(135deg,#6366f1,#7c3aed);color:#fff;font-weight:600}
+
 /* ── MISC ── */
 .ibox{background:#f5f3ff;border:1px solid rgba(99,102,241,.2);border-radius:9px;padding:9px 12px;font-size:12px;color:#7c3aed;margin-bottom:10px;font-weight:500}
 .ftitle{font-size:14px;font-weight:700;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #f3f4f6;color:#111827}

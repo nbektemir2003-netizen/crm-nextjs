@@ -162,6 +162,73 @@ function DatePicker({ value, onChange, placeholder }: { value: string; onChange:
   )
 }
 
+function CompanySelect({ value, onChange, companies, categories, includeBulk, placeholder }: {
+  value: string
+  onChange: (v: string) => void
+  companies: Company[]
+  categories: string[]
+  includeBulk?: boolean
+  placeholder?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [])
+
+  function select(v: string) { onChange(v); setOpen(false) }
+
+  const grouped = categories.map(cat => ({ cat, items: companies.filter(c => c.cat === cat) })).filter(g => g.items.length)
+  const uncategorized = companies.filter(c => !categories.includes(c.cat))
+
+  return (
+    <div className="cs-wrap" ref={ref}>
+      <input
+        className="dp-input"
+        readOnly
+        value={value}
+        placeholder={placeholder || '— выберите —'}
+        onClick={() => setOpen(o => !o)}
+      />
+      {open && (
+        <div className="cs-pop">
+          {includeBulk && (
+            <div className={`cs-item cs-bulk${value === 'Все компании' ? ' cs-sel' : ''}`} onClick={() => select('Все компании')}>
+              Все компании
+            </div>
+          )}
+          {grouped.map(g => (
+            <div key={g.cat} className="cs-group">
+              <div
+                className={`cs-cat${includeBulk ? ' cs-cat-click' : ''}${value === `Все компании — ${g.cat}` ? ' cs-sel' : ''}`}
+                onClick={() => includeBulk && select(`Все компании — ${g.cat}`)}
+              >
+                {g.cat}
+              </div>
+              {g.items.map(c => (
+                <div key={c.n} className={`cs-item${value === c.n ? ' cs-sel' : ''}`} onClick={() => select(c.n)}>{c.n}</div>
+              ))}
+            </div>
+          ))}
+          {uncategorized.length > 0 && (
+            <div className="cs-group">
+              <div className="cs-cat">Без категории</div>
+              {uncategorized.map(c => (
+                <div key={c.n} className={`cs-item${value === c.n ? ' cs-sel' : ''}`} onClick={() => select(c.n)}>{c.n}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function regBadge(r: string) {
   if (r === 'ОУР (НДС)') return <span className="b br">ОУР (НДС)</span>
   if (r === 'ОУР') return <span className="b bp">ОУР</span>
@@ -1204,25 +1271,7 @@ export default function DashboardPage() {
         <div className="ftitle">+ Новая задача</div>
         <div className="fr" style={{ marginBottom: 9 }}>
           <div className="fg"><label>Компания</label>
-            <select value={newTaskCo} onChange={e => setNewTaskCo(e.target.value)}>
-              <option value="">— выберите —</option>
-              <option>Все компании</option>
-              {adminSettings.categories.map(cat => {
-                const inCat = activeCompanies.filter(c => c.cat === cat)
-                if (!inCat.length) return null
-                return (
-                  <optgroup key={cat} label={cat}>
-                    <option>{`Все компании — ${cat}`}</option>
-                    {inCat.map(c => <option key={c.n}>{c.n}</option>)}
-                  </optgroup>
-                )
-              })}
-              {activeCompanies.some(c => !adminSettings.categories.includes(c.cat)) && (
-                <optgroup label="Без категории">
-                  {activeCompanies.filter(c => !adminSettings.categories.includes(c.cat)).map(c => <option key={c.n}>{c.n}</option>)}
-                </optgroup>
-              )}
-            </select>
+            <CompanySelect value={newTaskCo} onChange={setNewTaskCo} companies={activeCompanies} categories={adminSettings.categories} includeBulk />
           </div>
           <div className="fg"><label>Ответственный</label>
             <select value={newTaskEmp} onChange={e => setNewTaskEmp(e.target.value)}>
@@ -1602,22 +1651,7 @@ export default function DashboardPage() {
               <button className="modal-close" onClick={() => { setEditTaskIdx(-1); setEditTaskData(null) }}>×</button>
             </div>
             <div className="fg"><label>Компания</label>
-              <select value={editTaskData.co} onChange={e => setEditTaskData(p => p ? { ...p, co: e.target.value } : p)}>
-                {adminSettings.categories.map(cat => {
-                  const inCat = companies.filter(c => c.cat === cat)
-                  if (!inCat.length) return null
-                  return (
-                    <optgroup key={cat} label={cat}>
-                      {inCat.map(c => <option key={c.n}>{c.n}</option>)}
-                    </optgroup>
-                  )
-                })}
-                {companies.some(c => !adminSettings.categories.includes(c.cat)) && (
-                  <optgroup label="Без категории">
-                    {companies.filter(c => !adminSettings.categories.includes(c.cat)).map(c => <option key={c.n}>{c.n}</option>)}
-                  </optgroup>
-                )}
-              </select>
+              <CompanySelect value={editTaskData.co} onChange={v => setEditTaskData(p => p ? { ...p, co: v } : p)} companies={companies} categories={adminSettings.categories} />
             </div>
             <div className="fg"><label>Описание</label>
               <textarea rows={2} value={editTaskData.desc} onChange={e => setEditTaskData(p => p ? { ...p, desc: e.target.value } : p)} />
