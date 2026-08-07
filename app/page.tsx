@@ -395,6 +395,7 @@ export default function DashboardPage() {
   const [newTaskDesc, setNewTaskDesc] = useState('')
   const [newTaskDate, setNewTaskDate] = useState('')
   const [newTaskPrio, setNewTaskPrio] = useState('Обычный')
+  const [taskSubmitting, setTaskSubmitting] = useState(false)
 
   // Форма новой компании
   const [newCoName, setNewCoName] = useState('')
@@ -745,6 +746,7 @@ export default function DashboardPage() {
   })
 
   async function addTask() {
+    if (taskSubmitting) return
     if (!newTaskCo || !newTaskDesc || !newTaskDate) { alert('Заполни компанию, описание и срок'); return }
 
     let targets: string[]
@@ -758,15 +760,20 @@ export default function DashboardPage() {
     }
     if (!targets.length) { alert('В этой категории нет активных компаний'); return }
 
-    const saved: Task[] = []
-    for (const co of targets) {
-      const task: Task = { co, desc: newTaskDesc, emp: newTaskEmp, prio: newTaskPrio, date: newTaskDate, st: 'В работе' }
-      const res = await fetch('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(task) })
-      if (res.ok) saved.push(await res.json())
+    setTaskSubmitting(true)
+    try {
+      const saved: Task[] = []
+      for (const co of targets) {
+        const task: Task = { co, desc: newTaskDesc, emp: newTaskEmp, prio: newTaskPrio, date: newTaskDate, st: 'В работе' }
+        const res = await fetch('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(task) })
+        if (res.ok) saved.push(await res.json())
+      }
+      if (saved.length) setTasks(prev => [...saved, ...prev])
+      setNewTaskDesc(''); setNewTaskDate('')
+      showToast(saved.length > 1 ? `Создано задач: ${saved.length} ✓` : 'Задача добавлена ✓')
+    } finally {
+      setTaskSubmitting(false)
     }
-    if (saved.length) setTasks(prev => [...saved, ...prev])
-    setNewTaskDesc(''); setNewTaskDate('')
-    showToast(saved.length > 1 ? `Создано задач: ${saved.length} ✓` : 'Задача добавлена ✓')
   }
 
   async function doneTask(t: Task) {
@@ -1307,7 +1314,9 @@ export default function DashboardPage() {
             </select>
           </div>
         </div>
-        <button className="btn" onClick={addTask}>Добавить задачу</button>
+        <button className="btn" onClick={addTask} disabled={taskSubmitting} style={taskSubmitting ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>
+          {taskSubmitting ? 'Добавляем...' : 'Добавить задачу'}
+        </button>
       </div>
 
       {/* ═══════════════ НАЛОГИ ═══════════════ */}
