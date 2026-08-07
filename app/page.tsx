@@ -749,28 +749,13 @@ export default function DashboardPage() {
     if (taskSubmitting) return
     if (!newTaskCo || !newTaskDesc || !newTaskDate) { alert('Заполни компанию, описание и срок'); return }
 
-    let targets: string[]
-    if (newTaskCo === 'Все компании') {
-      targets = activeCompanies.map(c => c.n)
-    } else if (newTaskCo.startsWith('Все компании — ')) {
-      const cat = newTaskCo.slice('Все компании — '.length)
-      targets = activeCompanies.filter(c => c.cat === cat).map(c => c.n)
-    } else {
-      targets = [newTaskCo]
-    }
-    if (!targets.length) { alert('В этой категории нет активных компаний'); return }
-
     setTaskSubmitting(true)
     try {
-      const saved: Task[] = []
-      for (const co of targets) {
-        const task: Task = { co, desc: newTaskDesc, emp: newTaskEmp, prio: newTaskPrio, date: newTaskDate, st: 'В работе' }
-        const res = await fetch('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(task) })
-        if (res.ok) saved.push(await res.json())
-      }
-      if (saved.length) setTasks(prev => [...saved, ...prev])
+      const task: Task = { co: newTaskCo, desc: newTaskDesc, emp: newTaskEmp, prio: newTaskPrio, date: newTaskDate, st: 'В работе' }
+      const res = await fetch('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(task) })
+      if (res.ok) { const saved = await res.json(); setTasks(prev => [saved, ...prev]) }
       setNewTaskDesc(''); setNewTaskDate('')
-      showToast(saved.length > 1 ? `Создано задач: ${saved.length} ✓` : 'Задача добавлена ✓')
+      showToast('Задача добавлена ✓')
     } finally {
       setTaskSubmitting(false)
     }
