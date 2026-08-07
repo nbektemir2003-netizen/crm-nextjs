@@ -1116,7 +1116,21 @@ export default function DashboardPage() {
             <select value={newTaskCo} onChange={e => setNewTaskCo(e.target.value)}>
               <option value="">— выберите —</option>
               <option>Все компании</option>
-              {activeCompanies.map(c => <option key={c.n}>{c.n}</option>)}
+              {adminSettings.categories.map(cat => {
+                const inCat = activeCompanies.filter(c => c.cat === cat)
+                if (!inCat.length) return null
+                return (
+                  <optgroup key={cat} label={cat}>
+                    <option>{`Все компании — ${cat}`}</option>
+                    {inCat.map(c => <option key={c.n}>{c.n}</option>)}
+                  </optgroup>
+                )
+              })}
+              {activeCompanies.some(c => !adminSettings.categories.includes(c.cat)) && (
+                <optgroup label="Без категории">
+                  {activeCompanies.filter(c => !adminSettings.categories.includes(c.cat)).map(c => <option key={c.n}>{c.n}</option>)}
+                </optgroup>
+              )}
             </select>
           </div>
           <div className="fg"><label>Ответственный</label>
@@ -1499,7 +1513,21 @@ export default function DashboardPage() {
             <div className="fg"><label>Компания</label>
               <select value={editTaskData.co} onChange={e => setEditTaskData(p => p ? { ...p, co: e.target.value } : p)}>
                 <option>Все компании</option>
-                {companies.map(c => <option key={c.n}>{c.n}</option>)}
+                {adminSettings.categories.map(cat => {
+                  const inCat = companies.filter(c => c.cat === cat)
+                  if (!inCat.length) return null
+                  return (
+                    <optgroup key={cat} label={cat}>
+                      <option>{`Все компании — ${cat}`}</option>
+                      {inCat.map(c => <option key={c.n}>{c.n}</option>)}
+                    </optgroup>
+                  )
+                })}
+                {companies.some(c => !adminSettings.categories.includes(c.cat)) && (
+                  <optgroup label="Без категории">
+                    {companies.filter(c => !adminSettings.categories.includes(c.cat)).map(c => <option key={c.n}>{c.n}</option>)}
+                  </optgroup>
+                )}
               </select>
             </div>
             <div className="fg"><label>Описание</label>
