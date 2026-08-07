@@ -6,7 +6,7 @@ import * as XLSX from 'xlsx'
 
 // ─── ТИПЫ ───────────────────────────────
 type Company = { id?: string; n: string; freq: string; reg: string; cat: string; b: string; risk: string; nds: boolean; status: string; skipReports: string[]; extraReports: string[]; bin?: string; noReports?: boolean; hasEmployees?: boolean }
-type Task = { id?: string; co: string; desc: string; emp: string; prio: string; date: string; st: string }
+type Task = { id?: string; co: string; desc: string; emp: string; prio: string; date: string; st: string; by?: string; byId?: string }
 type TabId = 'co' | 'tasks' | 'tax' | 'rep' | 'pay' | 'admin'
 type PayEntry = { amount: string; comment: string; paid: boolean }
 type AdminReportItem = { code: string; period: 'quarterly' | 'annual' | 'monthly' | 'semi-annual'; hasMonths: boolean; onlyEvenQ?: boolean }
@@ -655,6 +655,7 @@ export default function DashboardPage() {
   }
 
   // ─── РОЛЬ ───────────────────────────────
+  const userId = (session?.user as any)?.id || ''
   const userName = (session?.user as any)?.name || ''
   const userRole = (session?.user as any)?.role || 'employee'
   const isAdmin = userRole === 'admin'
@@ -704,7 +705,12 @@ export default function DashboardPage() {
     if (!editTaskData) return
     if (!confirm('Удалить задачу?')) return
     if (editTaskData.id) {
-      await fetch('/api/tasks', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editTaskData.id }) })
+      const res = await fetch('/api/tasks', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editTaskData.id }) })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        showToast(d.error || 'Не удалось удалить задачу')
+        return
+      }
     }
     setTasks(prev => prev.filter(t => t.id !== editTaskData.id))
     setEditTaskIdx(-1); setEditTaskData(null)
@@ -1163,6 +1169,7 @@ export default function DashboardPage() {
                 <div className="tc-f">
                   <span className="b bb">{t.emp}</span>
                   <span className={dc}>{t.date} · {dt}</span>
+                  {t.by && <span style={{ fontSize: 11, color: '#9ca3af' }}>создал: {t.by}</span>}
                   <span style={{ marginLeft: 'auto', display: 'flex', gap: 5 }}>
                     {t.st === 'В работе' ? (
                       <button className="btn-sm" onClick={() => doneTask(t)}>Готово ✓</button>
@@ -1623,9 +1630,12 @@ export default function DashboardPage() {
                 </select>
               </div>
             </div>
+            {editTaskData.by && <p style={{ fontSize: 11, color: '#9ca3af', marginTop: -2, marginBottom: 8 }}>Создал: {editTaskData.by}</p>}
             <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
               <button className="btn" onClick={saveTaskEdit}>Сохранить</button>
-              <button className="btn-warn" onClick={deleteTask}>Удалить</button>
+              {(isAdmin || editTaskData.byId === userId || (!editTaskData.byId && editTaskData.by === userName)) && (
+                <button className="btn-warn" onClick={deleteTask}>Удалить</button>
+              )}
             </div>
           </div>
         </div>
