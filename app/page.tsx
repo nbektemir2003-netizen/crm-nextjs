@@ -39,7 +39,6 @@ function getQLABELS(y: number): Record<string, string> {
   }
 }
 const QORDER = ['1 квартал', '2 квартал', '3 квартал', '4 квартал', 'Годовой']
-const DEFAULT_USERS = ['Нурдаулет', 'Акмарал', 'Динара', 'Жания', 'Ұлбосын', 'Айзат']
 const DEFAULT_ADMIN: AdminSettings = {
   regimes: ['ОУР', 'УПРОЩЕНКА', 'СНР', 'КХ'],
   categories: ['КАФЕШКИ', 'ПЕРЕПРОДАЖА', 'ПРОИЗВОДСТВО', 'СТРОИТЕЛЬСТВО', 'ПРОЧИЕ УСЛУГИ', 'ИП-ЖОО', 'Школы JOO', 'РАЗОВОЕ', 'ПРОЧЕЕ'],
@@ -209,7 +208,7 @@ export default function DashboardPage() {
   const [syncCls, setSyncCls] = useState<SyncCls>('syncing')
   const [toast, setToast] = useState('')
   const [toastVisible, setToastVisible] = useState(false)
-  const [users, setUsers] = useState<string[]>(DEFAULT_USERS)
+  const [employees, setEmployees] = useState<string[]>([])
 
   // Фильтры компаний
   const [coQ, setCoQ] = useState('')
@@ -257,7 +256,7 @@ export default function DashboardPage() {
 
   // Форма новой задачи
   const [newTaskCo, setNewTaskCo] = useState('')
-  const [newTaskEmp, setNewTaskEmp] = useState(users[0] || '')
+  const [newTaskEmp, setNewTaskEmp] = useState('')
   const [newTaskDesc, setNewTaskDesc] = useState('')
   const [newTaskDate, setNewTaskDate] = useState('')
   const [newTaskPrio, setNewTaskPrio] = useState('Обычный')
@@ -282,8 +281,6 @@ export default function DashboardPage() {
   const [editTaskIdx, setEditTaskIdx] = useState(-1)
   const [editTaskData, setEditTaskData] = useState<Task | null>(null)
   const [showNotif, setShowNotif] = useState(false)
-  const [showEditUsers, setShowEditUsers] = useState(false)
-  const [newUserName, setNewUserName] = useState('')
   const [showAddCo, setShowAddCo] = useState(false)
   const [taxComments, setTaxComments] = useState<Record<string, string>>({})
   const [coPhones, setCoPhones] = useState<Record<string, string>>({})
@@ -305,15 +302,25 @@ export default function DashboardPage() {
     if (status === 'authenticated') loadData()
   }, [status])
 
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    fetch('/api/admin/users')
+      .then(r => r.ok ? r.json() : [])
+      .then((d: { name: string }[]) => setEmployees(d.map(u => u.name)))
+      .catch(() => {})
+  }, [status])
+
   // Синхронизируем рефы с текущим состоянием
   useEffect(() => { payEntriesRef.current = payEntries }, [payEntries])
   useEffect(() => { repExtraRef.current = repExtra }, [repExtra])
   useEffect(() => { taxCommentsRef.current = taxComments }, [taxComments])
 
   useEffect(() => {
+    if (!newTaskEmp && employees.length) setNewTaskEmp(employees[0])
+  }, [employees, newTaskEmp])
+
+  useEffect(() => {
     document.body.classList.remove('dark')
-    const savedUsers = localStorage.getItem('crm_users')
-    if (savedUsers) try { setUsers(JSON.parse(savedUsers)) } catch {}
     const tc = localStorage.getItem('crm_taxComments')
     if (tc) try { setTaxComments(JSON.parse(tc)) } catch {}
     const cp = localStorage.getItem('crm_coPhones')
@@ -768,20 +775,6 @@ export default function DashboardPage() {
     XLSX.writeFile(wb, `уплата_${label}_${payYear}.xlsx`)
   }
 
-  // ─── ПОЛЬЗОВАТЕЛИ ───────────────────────
-  function addUser() {
-    if (!newUserName.trim()) return
-    if (users.includes(newUserName.trim())) { alert('Такой сотрудник уже есть'); return }
-    const nu = [...users, newUserName.trim()]
-    setUsers(nu); localStorage.setItem('crm_users', JSON.stringify(nu))
-    setNewUserName('')
-  }
-  function removeUser(i: number) {
-    if (!confirm(`Удалить "${users[i]}"?`)) return
-    const nu = users.filter((_, idx) => idx !== i)
-    setUsers(nu); localStorage.setItem('crm_users', JSON.stringify(nu))
-  }
-
   // ─── УВЕДОМЛЕНИЯ ────────────────────────
   const myTasks = tasks.filter(t => t.emp === userName && t.st === 'В работе')
   const myDone = tasks.filter(t => t.emp === userName && t.st === 'Выполнено')
@@ -1071,7 +1064,7 @@ export default function DashboardPage() {
           <input type="text" placeholder="Поиск..." value={taskQ} onChange={e => setTaskQ(e.target.value)} />
           <select value={taskEmp} onChange={e => setTaskEmp(e.target.value)}>
             <option value="">Все сотрудники</option>
-            {users.map(u => <option key={u}>{u}</option>)}
+            {employees.map(u => <option key={u}>{u}</option>)}
           </select>
           <select value={taskPrio} onChange={e => setTaskPrio(e.target.value)}>
             <option value="">Все приоритеты</option>
@@ -1128,7 +1121,7 @@ export default function DashboardPage() {
           </div>
           <div className="fg"><label>Ответственный</label>
             <select value={newTaskEmp} onChange={e => setNewTaskEmp(e.target.value)}>
-              {users.map(u => <option key={u}>{u}</option>)}
+              {employees.map(u => <option key={u}>{u}</option>)}
             </select>
           </div>
         </div>
@@ -1515,7 +1508,7 @@ export default function DashboardPage() {
             <div className="fr">
               <div className="fg"><label>Ответственный</label>
                 <select value={editTaskData.emp} onChange={e => setEditTaskData(p => p ? { ...p, emp: e.target.value } : p)}>
-                  {users.map(u => <option key={u}>{u}</option>)}
+                  {employees.map(u => <option key={u}>{u}</option>)}
                 </select>
               </div>
               <div className="fg"><label>Приоритет</label>
