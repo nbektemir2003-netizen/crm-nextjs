@@ -94,6 +94,74 @@ function dl(d: string) {
   return Math.round((x.getTime() - today.getTime()) / 86400000)
 }
 
+function fmtISO(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function DatePicker({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const [open, setOpen] = useState(false)
+  const [viewDate, setViewDate] = useState(() => (value ? new Date(value + 'T00:00:00') : new Date()))
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [])
+
+  useEffect(() => {
+    if (open) setViewDate(value ? new Date(value + 'T00:00:00') : new Date())
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const y = viewDate.getFullYear(), m = viewDate.getMonth()
+  const startOffset = (new Date(y, m, 1).getDay() + 6) % 7
+  const cells = Array.from({ length: 42 }, (_, i) => {
+    const dt = new Date(y, m, 1 - startOffset + i)
+    return { date: dt, iso: fmtISO(dt), cur: dt.getMonth() === m }
+  })
+  const todayIso = fmtISO(new Date())
+  const monthLabel = viewDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })
+
+  return (
+    <div className="dp-wrap" ref={ref}>
+      <input
+        className="dp-input"
+        readOnly
+        value={value ? new Date(value + 'T00:00:00').toLocaleDateString('ru-RU') : ''}
+        placeholder={placeholder || 'Выберите дату'}
+        onClick={() => setOpen(o => !o)}
+      />
+      {open && (
+        <div className="dp-pop">
+          <div className="dp-head">
+            <button type="button" className="dp-nav" onClick={() => setViewDate(new Date(y, m - 1, 1))}>‹</button>
+            <span style={{ textTransform: 'capitalize' }}>{monthLabel}</span>
+            <button type="button" className="dp-nav" onClick={() => setViewDate(new Date(y, m + 1, 1))}>›</button>
+          </div>
+          <div className="dp-grid">
+            {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(d => <div key={d} className="dp-dow">{d}</div>)}
+            {cells.map((c, i) => (
+              <div
+                key={i}
+                className={`dp-day${c.cur ? '' : ' dp-muted'}${c.iso === todayIso ? ' dp-today' : ''}${c.iso === value ? ' dp-selected' : ''}`}
+                onClick={() => { onChange(c.iso); setOpen(false) }}
+              >
+                {c.date.getDate()}
+              </div>
+            ))}
+          </div>
+          <div className="dp-foot">
+            <button type="button" className="dp-today-btn" onClick={() => { onChange(todayIso); setOpen(false) }}>Сегодня</button>
+            {value && <button type="button" className="dp-clear-btn" onClick={() => { onChange(''); setOpen(false) }}>Очистить</button>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function regBadge(r: string) {
   if (r === 'ОУР (НДС)') return <span className="b br">ОУР (НДС)</span>
   if (r === 'ОУР') return <span className="b bp">ОУР</span>
@@ -1143,7 +1211,7 @@ export default function DashboardPage() {
           <textarea rows={2} placeholder="Что нужно сделать..." value={newTaskDesc} onChange={e => setNewTaskDesc(e.target.value)} />
         </div>
         <div className="fr" style={{ marginBottom: 9 }}>
-          <div className="fg"><label>Срок</label><input type="date" value={newTaskDate} onChange={e => setNewTaskDate(e.target.value)} /></div>
+          <div className="fg"><label>Срок</label><DatePicker value={newTaskDate} onChange={setNewTaskDate} /></div>
           <div className="fg"><label>Приоритет</label>
             <select value={newTaskPrio} onChange={e => setNewTaskPrio(e.target.value)}>
               <option>Обычный</option><option>Срочно</option><option>Критично</option>
@@ -1547,7 +1615,7 @@ export default function DashboardPage() {
             </div>
             <div className="fr">
               <div className="fg"><label>Срок</label>
-                <input type="date" value={editTaskData.date} onChange={e => setEditTaskData(p => p ? { ...p, date: e.target.value } : p)} />
+                <DatePicker value={editTaskData.date} onChange={v => setEditTaskData(p => p ? { ...p, date: v } : p)} />
               </div>
               <div className="fg"><label>Статус</label>
                 <select value={editTaskData.st} onChange={e => setEditTaskData(p => p ? { ...p, st: e.target.value } : p)}>
