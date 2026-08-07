@@ -679,11 +679,27 @@ export default function DashboardPage() {
 
   async function addTask() {
     if (!newTaskCo || !newTaskDesc || !newTaskDate) { alert('Заполни компанию, описание и срок'); return }
-    const task: Task = { co: newTaskCo, desc: newTaskDesc, emp: newTaskEmp, prio: newTaskPrio, date: newTaskDate, st: 'В работе' }
-    const res = await fetch('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(task) })
-    if (res.ok) { const saved = await res.json(); setTasks(prev => [saved, ...prev]) }
+
+    let targets: string[]
+    if (newTaskCo === 'Все компании') {
+      targets = activeCompanies.map(c => c.n)
+    } else if (newTaskCo.startsWith('Все компании — ')) {
+      const cat = newTaskCo.slice('Все компании — '.length)
+      targets = activeCompanies.filter(c => c.cat === cat).map(c => c.n)
+    } else {
+      targets = [newTaskCo]
+    }
+    if (!targets.length) { alert('В этой категории нет активных компаний'); return }
+
+    const saved: Task[] = []
+    for (const co of targets) {
+      const task: Task = { co, desc: newTaskDesc, emp: newTaskEmp, prio: newTaskPrio, date: newTaskDate, st: 'В работе' }
+      const res = await fetch('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(task) })
+      if (res.ok) saved.push(await res.json())
+    }
+    if (saved.length) setTasks(prev => [...saved, ...prev])
     setNewTaskDesc(''); setNewTaskDate('')
-    showToast('Задача добавлена ✓')
+    showToast(saved.length > 1 ? `Создано задач: ${saved.length} ✓` : 'Задача добавлена ✓')
   }
 
   async function doneTask(t: Task) {
@@ -1587,13 +1603,11 @@ export default function DashboardPage() {
             </div>
             <div className="fg"><label>Компания</label>
               <select value={editTaskData.co} onChange={e => setEditTaskData(p => p ? { ...p, co: e.target.value } : p)}>
-                <option>Все компании</option>
                 {adminSettings.categories.map(cat => {
                   const inCat = companies.filter(c => c.cat === cat)
                   if (!inCat.length) return null
                   return (
                     <optgroup key={cat} label={cat}>
-                      <option>{`Все компании — ${cat}`}</option>
                       {inCat.map(c => <option key={c.n}>{c.n}</option>)}
                     </optgroup>
                   )
