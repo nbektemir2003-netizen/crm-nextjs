@@ -800,6 +800,19 @@ export default function DashboardPage() {
     showToast('Задача удалена ✓')
   }
 
+  async function quickDeleteTask(t: Task) {
+    if (!t.id) return
+    if (!confirm(`Удалить задачу «${t.desc}»?`)) return
+    const res = await fetch('/api/tasks', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id }) })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      showToast(d.error || 'Не удалось удалить задачу')
+      return
+    }
+    setTasks(prev => prev.filter(x => x.id !== t.id))
+    showToast('Задача удалена ✓')
+  }
+
   // ─── НАЛОГИ ─────────────────────────────
   function toggleTax(key: string) {
     const nd = { ...taxDone, [key]: !taxDone[key] }
@@ -1261,6 +1274,10 @@ export default function DashboardPage() {
                     )}
                     <button className="btn-sm" style={{ background: '#f5f5f0', color: '#5f5e5a', border: '1px solid #d3d1c7' }}
                       onClick={() => { setEditTaskData({ ...t }); setEditTaskIdx(tasks.findIndex(x => x.id === t.id)) }}>✏️</button>
+                    {(isAdmin || t.byId === userId || (!t.byId && t.by === userName)) && (
+                      <button className="btn-sm" style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}
+                        onClick={() => quickDeleteTask(t)}>🗑</button>
+                    )}
                   </span>
                 </div>
               </div>
