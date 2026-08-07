@@ -1224,10 +1224,16 @@ export default function DashboardPage() {
         </div>
         <div className="ff">
           <input type="text" placeholder="Поиск..." value={taskQ} onChange={e => setTaskQ(e.target.value)} />
-          <select value={taskEmp} onChange={e => setTaskEmp(e.target.value)}>
-            <option value="">Все сотрудники</option>
-            {employees.map(u => <option key={u}>{u}</option>)}
-          </select>
+          {isAdmin ? (
+            <select value={taskEmp} onChange={e => setTaskEmp(e.target.value)}>
+              <option value="">Все сотрудники</option>
+              {employees.map(u => <option key={u}>{u}</option>)}
+            </select>
+          ) : (
+            <select value={userName} disabled>
+              <option>{userName}</option>
+            </select>
+          )}
           <select value={taskPrio} onChange={e => setTaskPrio(e.target.value)}>
             <option value="">Все приоритеты</option>
             <option>Критично</option><option>Срочно</option><option>Обычный</option>
