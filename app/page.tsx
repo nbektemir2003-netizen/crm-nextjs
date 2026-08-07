@@ -1122,6 +1122,7 @@ export default function DashboardPage() {
           <div className="fg"><label>Компания</label>
             <select value={newTaskCo} onChange={e => setNewTaskCo(e.target.value)}>
               <option value="">— выберите —</option>
+              <option>Все компании</option>
               {activeCompanies.map(c => <option key={c.n}>{c.n}</option>)}
             </select>
           </div>
@@ -1504,6 +1505,7 @@ export default function DashboardPage() {
             </div>
             <div className="fg"><label>Компания</label>
               <select value={editTaskData.co} onChange={e => setEditTaskData(p => p ? { ...p, co: e.target.value } : p)}>
+                <option>Все компании</option>
                 {companies.map(c => <option key={c.n}>{c.n}</option>)}
               </select>
             </div>
